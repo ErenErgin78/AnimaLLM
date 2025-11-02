@@ -1,5 +1,3 @@
-        // Step state for two-stage response
-        let stepData = null; // { steps: [{mood, text}, {mood, text}], index: 0 }
         // Theme state
         function applyTheme(theme) {
             const root = document.documentElement;
@@ -145,26 +143,6 @@
             if (btn) btn.disabled = disabled;
         }
 
-        function showNextStep() {
-            if (!stepData) return;
-            if (stepData.index >= stepData.steps.length - 1) return;
-            stepData.index += 1;
-            const s = stepData.steps[stepData.index];
-            if (window.__lastResponseSecondEmoji) {
-                const node = document.getElementById('face-emoji');
-                if (node) {
-                    node.classList.add('anim');
-                    setTimeout(() => { node.textContent = window.__lastResponseSecondEmoji; node.classList.remove('anim'); fitFaceEmoji(); }, 150);
-                }
-            } else {
-                setFaceFromText(s.text);
-            }
-            addMessage(s.text, false);
-            if (stepData.index >= stepData.steps.length - 1) {
-                document.getElementById('next-btn').disabled = true;
-                disableInput(false);
-            }
-        }
 
         async function sendMessage() {
             const input = document.getElementById('user-input');
@@ -254,51 +232,34 @@
                     return;
                 }
 
-                // Try parse JSON (ilk/ikinci ruh hali-cevap), fallback to plain text
-                let steps = null;
-                const j = extractJsonObject(data.response);
-                if (j && j.ilk_ruh_hali && j.ilk_cevap && j.ikinci_ruh_hali && j.ikinci_cevap) {
-                    steps = [
-                        { mood: j.ilk_ruh_hali, text: j.ilk_cevap },
-                        { mood: j.ikinci_ruh_hali, text: j.ikinci_cevap }
-                    ];
-                }
-
-                if (steps) {
+                // EMOTION (LoRA) response branch - direkt mesajı göster, 1 emoji'yi face-container'da göster
+                if (data.flow_type === "EMOTION" || data.emoji) {
                     // PLAIN (emotion) branch: green
                     try {
                         setActivePlainGlow();
                     } catch (_) {}
-                    stepData = { steps, index: 0 };
-                    // Show first (server-provided emoji preferred)
-                    addMessage(steps[0].text, false);
-                    if (data.first_emoji) {
-                        const node = document.getElementById('face-emoji');
-                        if (node) {
-                            node.classList.add('anim');
-                            setTimeout(() => { node.textContent = data.first_emoji; node.classList.remove('anim'); fitFaceEmoji(); }, 150);
-                        }
-                    } else {
-                        setFaceFromText(steps[0].text);
-                    }
-                    const nextBtn = document.getElementById('next-btn');
-                    nextBtn.disabled = false;
-                    // second emoji cache for next step
-                    window.__lastResponseSecondEmoji = data.second_emoji || null;
-                } else {
-                    // Plain text behavior (may be PLAIN path too)
-                    addMessage(data.response, false);
-                    if (data.first_emoji) {
-                        try { setActivePlainGlow(); } catch (_) {}
-                        
-                        const node = document.getElementById('face-emoji');
-                        if (node) {
-                            node.classList.add('anim');
-                            setTimeout(() => { node.textContent = data.first_emoji; node.classList.remove('anim'); fitFaceEmoji(); }, 150);
-                        }
+                    
+                    // Direkt mesajı göster
+                    addMessage(data.response || '', false);
+                    
+                    // 1 emoji'yi face-container'da göster
+                    const faceNode = document.getElementById('face-emoji');
+                    if (faceNode && data.emoji) {
+                        faceNode.classList.add('anim');
+                        setTimeout(() => {
+                            faceNode.textContent = data.emoji;
+                            faceNode.classList.remove('anim');
+                            fitFaceEmoji();
+                        }, 150);
                     } else {
                         setFaceFromText(data.response);
                     }
+                    
+                    disableInput(false);
+                } else {
+                    // Diğer durumlar için plain text behavior
+                    addMessage(data.response || '', false);
+                    setFaceFromText(data.response || '');
                     disableInput(false);
                 }
 
