@@ -1,29 +1,49 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Duygu Chatbot</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/static/app.css">
-    <script src="/static/app.js" defer></script>
-    </head>
+    <!-- CSS Modülleri -->
+    <link rel="stylesheet" href="/static/css/app.css">
+    
+    <!-- JavaScript Modülleri (sıra önemli!) -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/matrix.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/emoji.js"></script>
+    <script src="/static/js/lightbox.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/nodes.js"></script>
+    <script src="/static/js/app.js" defer></script>
+</head>
 <body>
+    <!-- Matrix rain canvas - arka planda akan karakterler -->
+    <canvas id="matrix-canvas"></canvas>
+    
+    <!-- SVG wires - node'lar arası bağlantı çizgileri -->
     <svg id="wires" class="wires"></svg>
-    <svg id="beams" class="wires" style="z-index:2"></svg>
-    <!-- Parent hubs -->
+    
+    <!-- Node sistemi - parent hub'lar -->
     <div id="fn-parent-rag" class="func-node">📚 RAG</div>
     <div id="fn-parent-api" class="func-node">🔌 API</div>
-    <div id="fn-parent-plain" class="func-node">💬 PLAIN</div>
+    <div id="fn-parent-plain" class="func-node">💬 Chat</div>
     <div id="fn-parent-stats" class="func-node">📊 İstatistik</div>
+    
+    <!-- Node sistemi - API child node'ları (hayvanlar) -->
     <div id="fn-dog_photo" class="func-node">🐶 dog - photo</div>
     <div id="fn-dog_facts" class="func-node">🐶 dog - facts</div>
     <div id="fn-cat_photo" class="func-node">🐱 cat - photo</div>
     <div id="fn-cat_facts" class="func-node">🐱 cat - facts</div>
     <div id="fn-fox_photo" class="func-node">🦊 fox - photo</div>
     <div id="fn-duck_photo" class="func-node">🦆 duck - photo</div>
+    
+    <!-- Node sistemi - RAG child node'ları (PDF'ler) -->
     <div id="fn-pdf-python" class="func-node">🐱 Cat Care</div>
     <div id="fn-pdf-anayasa" class="func-node">🦜 Parrot Care</div>
     <div id="fn-pdf-clean" class="func-node">🐰 Rabbit Care</div>
+    
+    <!-- Lightbox - görsel tam ekran gösterimi -->
     <div id="lightbox" class="lightbox" onclick="if(event.target===this) closeLightbox()">
         <div class="lightbox-content">
             <button class="lightbox-close" onclick="closeLightbox()">✕</button>
@@ -31,28 +51,40 @@
             <a id="lightbox-download" class="lightbox-download" href="#" download>⤓ İndir</a>
         </div>
     </div>
-    <canvas id="matrix-canvas"></canvas>
+    
+    <!-- Ana container - chat arayüzü -->
     <div class="container">
-        <h1>🤖 Animal-Emotion Chatbot
+        <h1>
+            🤖 Animal-Emotion Chatbot
             <button class="theme-btn" onclick="toggleTheme()">🌗 Tema</button>
         </h1>
+        
+        <!-- Yüz emoji container'ı -->
         <div class="face-container">
             <div id="face-emoji" class="face-emoji">🙂</div>
         </div>
+        
+        <!-- Chat mesaj kutusu -->
         <div id="chat-box" class="chat-box"></div>
+        
+        <!-- Input alanı -->
         <div class="input-area">
-            <input type="text" id="user-input" placeholder="Mesajınızı yazın..." onkeypress="handleKeyPress(event)">
+            <input 
+                type="text" 
+                id="user-input" 
+                placeholder="Mesajınızı yazın..." 
+                onkeypress="handleKeyPress(event)"
+            >
             <button id="send-btn" onclick="sendMessage()">Gönder</button>
         </div>
+        
+        <!-- İstatistik alanı -->
         <div class="stats">
             <div class="stat-box">
                 <strong>İstekler</strong><br>
                 <span id="req-count">0</span>
             </div>
         </div>
-        
     </div>
 </body>
 </html>
-
-
