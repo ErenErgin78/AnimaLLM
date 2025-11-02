@@ -75,3 +75,9 @@ data/mood_counter.txt
 .chroma
 Example/*
 .cursor/
+
+
+# Lora
+Lora/Model/en iyi/
+Lora/Model/ikinci_sıra/
+Lora/Model/üçüncü_sıra/
