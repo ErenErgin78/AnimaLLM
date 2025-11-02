@@ -232,30 +232,57 @@
                     return;
                 }
 
-                // EMOTION (LoRA) response branch - direkt mesajı göster, 1 emoji'yi face-container'da göster
-                if (data.flow_type === "EMOTION" || data.emoji) {
+                // EMOTION (LoRA) response branch - direkt mesajı göster, sadece Gemini'den gelen emoji'yi face-container'da göster
+                if (data.flow_type === "EMOTION") {
                     // PLAIN (emotion) branch: green
-                    try {
-                        setActivePlainGlow();
-                    } catch (_) {}
+                    setActivePlainGlow();
                     
-                    // Direkt mesajı göster
+                    // Direkt mesajı göster (LoRA response)
                     addMessage(data.response || '', false);
                     
-                    // 1 emoji'yi face-container'da göster
+                    // Face container'a SADECE Gemini'den gelen duygu emoji'sini koy (LoRA'dan gelen emoji'yi ASLA kullanma)
+                    // ÖNEMLİ: data.emoji'yi direkt kullan, LoRA response'undaki emoji'yi hiç kullanma
                     const faceNode = document.getElementById('face-emoji');
-                    if (faceNode && data.emoji) {
-                        faceNode.classList.add('anim');
-                        setTimeout(() => {
-                            faceNode.textContent = data.emoji;
-                            faceNode.classList.remove('anim');
-                            fitFaceEmoji();
-                        }, 150);
-                    } else {
-                        setFaceFromText(data.response);
+                    if (faceNode) {
+                        const emojiFromBackend = data.emoji;
+                        console.log('[DEBUG EMOTION] data.emoji:', emojiFromBackend, 'type:', typeof emojiFromBackend);
+                        
+                        // Backend'den gelen emoji'yi kullan (mutlaka backend'den gelen emoji)
+                        // LoRA response'undaki emoji'yi hiç kullanma - extractFirstEmoji ASLA çağırılmayacak
+                        if (emojiFromBackend && typeof emojiFromBackend === 'string' && emojiFromBackend.trim()) {
+                            // Backend'den gelen emoji'yi kullan (Unicode emoji veya text emoji olabilir: ^_^, 😊, vb.)
+                            faceNode.classList.add('anim');
+                            setTimeout(() => {
+                                faceNode.textContent = emojiFromBackend.trim();
+                                faceNode.classList.remove('anim');
+                                fitFaceEmoji();
+                                console.log('[DEBUG EMOTION] Face container emoji set (backend):', emojiFromBackend.trim());
+                            }, 150);
+                        } else {
+                            // Eğer backend emoji göndermediyse varsayılan emoji kullan (LoRA'dan emoji çıkarma)
+                            console.log('[DEBUG EMOTION] data.emoji bulunamadı, varsayılan emoji kullanılıyor (LoRA emoji kullanılmayacak)');
+                            faceNode.classList.add('anim');
+                            setTimeout(() => {
+                                faceNode.textContent = '🙂';
+                                faceNode.classList.remove('anim');
+                                fitFaceEmoji();
+                            }, 150);
+                        }
                     }
                     
                     disableInput(false);
+                    return;
+                }
+                // STATS response branch
+                if (data.flow_type === "STATS" || data.stats) {
+                    // STATS branch → açık mor
+                    setActiveStatsGlow();
+                    
+                    // İstatistik mesajını göster
+                    addMessage(data.response || '', false);
+                    setFaceFromText(data.response || '');
+                    disableInput(false);
+                    return;
                 } else {
                     // Diğer durumlar için plain text behavior
                     addMessage(data.response || '', false);
@@ -338,12 +365,19 @@
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
         // Wires + draggable nodes logic
         function clearGlow() {
-            document.querySelectorAll('.func-node.active, .func-node.active-rag, .func-node.active-api, .func-node.active-plain').forEach(n => {
-                n.classList.remove('active','active-rag','active-api','active-plain');
+            document.querySelectorAll('.func-node.active, .func-node.active-rag, .func-node.active-api, .func-node.active-plain, .func-node.active-stats').forEach(n => {
+                n.classList.remove('active','active-rag','active-api','active-plain','active-stats');
             });
-            document.querySelectorAll('.wire.glow, .wire.glow-rag, .wire.glow-api, .wire.glow-plain').forEach(n => {
-                n.classList.remove('glow','glow-rag','glow-api','glow-plain');
+            document.querySelectorAll('.wire.glow, .wire.glow-rag, .wire.glow-api, .wire.glow-plain, .wire.glow-stats').forEach(n => {
+                n.classList.remove('glow','glow-rag','glow-api','glow-plain','glow-stats');
+                // Wire'ın gizli olmadığından emin ol (hidden sınıfı varsa kaldır)
+                n.classList.remove('hidden');
             });
+            // Container ve face-container glow'unu temizle
+            const container = document.querySelector('.container');
+            const faceContainer = document.querySelector('.face-container');
+            if (container) container.classList.remove('glow-green', 'glow-stats');
+            if (faceContainer) faceContainer.classList.remove('glow-stats');
         }
 
         function setActiveFunctionGlow(animal, type) {
@@ -397,6 +431,29 @@
             if (!GROUPS['parent-plain'].open) setCollapsedState('parent-plain', true);
         }
 
+        function setActiveStatsGlow() {
+            // STATS branch → açık mor; nodes, wires, container ve face-container glow
+            clearGlow();
+            const parent = document.getElementById('fn-parent-stats');
+            if (parent) parent.classList.add('active-stats');
+            const parentWire = document.getElementById('wire-parent-stats');
+            if (parentWire) {
+                parentWire.classList.add('glow-stats');
+                parentWire.style.display = '';
+                parentWire.style.opacity = '1';
+            }
+            // Container (IP) ve face-container (baloncuk) için glow ekle
+            const container = document.querySelector('.container');
+            const faceContainer = document.querySelector('.face-container');
+            if (container) container.classList.add('glow-stats');
+            if (faceContainer) faceContainer.classList.add('glow-stats');
+            if (!GROUPS['parent-stats']) {
+                GROUPS['parent-stats'] = { open: false, children: [] };
+            }
+            if (!GROUPS['parent-stats'].open) setCollapsedState('parent-stats', true);
+            updateRopesImmediate();
+        }
+
         function handleRagResponse(data) {
             // RAG için özel davranış: tüm metni göster (kesme yok)
             const response = data.response || 'Tamam.';
@@ -416,6 +473,7 @@
             { id: 'fn-parent-rag', side: 'left', top: 220, left: 160 },
             { id: 'fn-parent-api', side: 'right', top: 220, right: 160 },
             { id: 'fn-parent-plain', side: 'left', top: 120, left: 260, prompt: 'Bugün çok kötü hissediyorum :(' },
+            { id: 'fn-parent-stats', side: 'right', top: 120, right: 260, prompt: 'bugün kaç kere mutluluk tetikledin?' },
             // API children (right side near API parent)
             { id: 'fn-dog_photo', side: 'right', prompt: 'Bana bir köpek fotoğrafı ver', top: 120, right: 32 },
             { id: 'fn-dog_facts', side: 'right', prompt: 'Bana bir köpek bilgisi ver', top: 180, right: 32 },
@@ -449,6 +507,7 @@
             'parent-api': { open: false, children: ['dog_photo','dog_facts','cat_photo','cat_facts','fox_photo','duck_photo'] },
             'parent-rag': { open: false, children: ['pdf-python','pdf-anayasa','pdf-clean'] },
             'parent-plain': { open: false, children: [] },
+            'parent-stats': { open: false, children: [] },
         };
 
         function setCollapsedState(groupKey, open) {
@@ -523,12 +582,16 @@
                 if (cfg.id === 'fn-parent-plain') {
                     el.addEventListener('click', () => { if (el.dataset.dragMoved !== 'true') setCollapsedState('parent-plain', !GROUPS['parent-plain'].open); });
                 }
+                if (cfg.id === 'fn-parent-stats') {
+                    el.addEventListener('click', () => { if (el.dataset.dragMoved !== 'true') setCollapsedState('parent-stats', !GROUPS['parent-stats'].open); });
+                }
                 makeDraggable(el);
             });
             // Start collapsed: hide all children
             setCollapsedState('parent-api', false);
             setCollapsedState('parent-rag', false);
             setCollapsedState('parent-plain', false);
+            setCollapsedState('parent-stats', false);
             initRopes();
             updateRopesImmediate();
             requestAnimationFrame(stepRopes);
@@ -582,7 +645,7 @@
             svg.setAttribute('width', window.innerWidth);
             svg.setAttribute('height', window.innerHeight);
             // Ensure parent wires exist (parent→chat)
-            ['parent-api','parent-rag','parent-plain'].forEach(pk => {
+            ['parent-api','parent-rag','parent-plain','parent-stats'].forEach(pk => {
                 let pw = document.getElementById('wire-' + pk);
                 if (!pw) {
                     pw = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -590,7 +653,7 @@
                     pw.setAttribute('class', 'wire');
                     svg.appendChild(pw);
                 }
-                ROPES[pk] = ROPES[pk] || { points: [], pathEl: pw, side: (pk==='parent-api'?'right':'left'), restLen: 0 };
+                ROPES[pk] = ROPES[pk] || { points: [], pathEl: pw, side: (pk==='parent-api'||pk==='parent-stats'?'right':'left'), restLen: 0 };
             });
             DRAGGABLES.forEach(cfg => {
                 const key = cfg.id.replace('fn-','');
@@ -629,9 +692,9 @@
                 };
             }
             // Parent wires go to container edge
-            if (key === 'parent-api' || key === 'parent-rag' || key === 'parent-plain') {
+            if (key === 'parent-api' || key === 'parent-rag' || key === 'parent-plain' || key === 'parent-stats') {
                 const anchorY = Math.min(Math.max(cRect.top + 0.5 * cRect.height, cRect.top + 24), cRect.bottom - 24);
-                const side = (key === 'parent-api') ? 'right' : 'left';
+                const side = (key === 'parent-api' || key === 'parent-stats') ? 'right' : 'left';
                 return {
                     startX: nRect.left + nRect.width / 2,
                     startY: nRect.top + nRect.height / 2,

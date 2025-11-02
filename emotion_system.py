@@ -56,7 +56,8 @@ try:
     if not CHAT_HISTORY_FILE.exists():
         CHAT_HISTORY_FILE.write_text("", encoding="utf-8")
     if not MOOD_COUNTER_FILE.exists():
-        MOOD_COUNTER_FILE.write_text("{}", encoding="utf-8")
+        # Yeni format: boş JSON array (zaman damgalı kayıtlar)
+        MOOD_COUNTER_FILE.write_text("[]", encoding="utf-8")
 except Exception:
     MOOD_EMOJIS = {}
 
@@ -135,25 +136,92 @@ class EmotionChatbot:
         return "\n".join(prompt_parts)
 
     def _load_mood_counts(self) -> Dict[str, int]:
-        """Kalıcı duygu sayaçlarını yükler"""
+        """Kalıcı duygu sayaçlarını yükler - eski ve yeni formatı destekler"""
         try:
-            raw = MOOD_COUNTER_FILE.read_text(encoding="utf-8").strip() or "{}"
+            raw = MOOD_COUNTER_FILE.read_text(encoding="utf-8").strip()
+            if not raw:
+                return {}
+            
             data = json.loads(raw)
-            if isinstance(data, dict):
+            
+            # Yeni format: JSON array (zaman damgalı kayıtlar)
+            if isinstance(data, list):
+                counts: Dict[str, int] = {m: 0 for m in self.allowed_moods}
+                for record in data:
+                    if isinstance(record, dict):
+                        mood = str(record.get("mood", "")).strip()
+                        if mood in counts:
+                            counts[mood] += 1
+                return counts
+            
+            # Eski format: JSON object (sayılar)
+            elif isinstance(data, dict):
                 return {str(k): int(v) for k, v in data.items()}
         except Exception:
             pass
         return {}
 
-    def _save_mood_counts(self) -> None:
-        """Duygu sayaçlarını kalıcı olarak kaydeder"""
+    def _load_mood_history(self) -> list[Dict[str, Any]]:
+        """Zaman damgalı duygu kayıtlarını yükler"""
         try:
+            raw = MOOD_COUNTER_FILE.read_text(encoding="utf-8").strip()
+            if not raw:
+                return []
+            
+            data = json.loads(raw)
+            
+            # Yeni format: JSON array
+            if isinstance(data, list):
+                return data
+            
+            # Eski format: JSON object - yeni formata dönüştür
+            elif isinstance(data, dict):
+                history = []
+                today = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                for mood, count in data.items():
+                    if isinstance(count, int) and count > 0:
+                        # Her sayı için bir kayıt oluştur (bugünün tarihiyle)
+                        for _ in range(min(count, 1000)):  # Güvenlik için maksimum 1000
+                            history.append({
+                                "mood": str(mood).strip(),
+                                "timestamp": today
+                            })
+                return history
+        except Exception as e:
+            print(f"[EMOTION] Duygu geçmişi yükleme hatası: {e}")
+        return []
+
+    def _append_mood_record(self, mood: str) -> None:
+        """Duygu kaydını zaman damgasıyla kalıcı olarak ekler"""
+        try:
+            # Mevcut kayıtları yükle
+            history = self._load_mood_history()
+            
+            # Yeni kayıt ekle
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            history.append({
+                "mood": str(mood).strip(),
+                "timestamp": timestamp
+            })
+            
+            # Güvenlik: Maksimum 10000 kayıt tut (eski kayıtları koru)
+            if len(history) > 10000:
+                # En eski kayıtları sil, son 10000'i tut
+                history = history[-10000:]
+            
+            # Dosyaya kaydet
             MOOD_COUNTER_FILE.write_text(
-                json.dumps(self.emotion_counts, ensure_ascii=False, indent=2),
+                json.dumps(history, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-        except Exception:
-            pass
+            print(f"[EMOTION] Duygu kaydı dosyaya yazıldı: {mood} ({timestamp})")
+        except Exception as e:
+            print(f"[EMOTION] Duygu kaydı ekleme hatası: {e}")
+
+    def _save_mood_counts(self) -> None:
+        """Geriye uyumluluk için - artık kullanılmıyor, _append_mood_record kullanılmalı"""
+        # Bu metod artık kullanılmıyor ama geriye uyumluluk için bırakıldı
+        pass
 
     def _append_chat_history(self, user_message: str, response_text: str) -> None:
         """Konuşma geçmişini dosyaya ekler"""
@@ -221,10 +289,10 @@ class EmotionChatbot:
             # adapter_config.json ve lora.safetensors (veya adapter_model.safetensors) dosyalarını ara
             adapter_config_path = lora_path / "adapter_config.json"
             
-            # Model dosyasını kontrol et - önce lora.safetensors, sonra adapter_model.safetensors
-            adapter_model_path = lora_path / "lora.safetensors"
+            # Model dosyasını kontrol et - önce adapter_model.safetensors, sonra lora.safetensors
+            adapter_model_path = lora_path / "adapter_model.safetensors"
             if not adapter_model_path.exists():
-                adapter_model_path = lora_path / "adapter_model.safetensors"
+                adapter_model_path = lora_path / "lora.safetensors"
             
             # Eğer adapter_config.json yoksa, "en iyi" klasöründen al (fallback)
             if not adapter_config_path.exists():
@@ -251,7 +319,7 @@ class EmotionChatbot:
                 return
             
             if not adapter_model_path.exists():
-                print(f"[ERROR] LoRA model dosyası bulunamadı (lora.safetensors veya adapter_model.safetensors): {lora_path}")
+                print(f"[ERROR] LoRA model dosyası bulunamadı (adapter_model.safetensors veya lora.safetensors): {lora_path}")
                 self._lora_loaded = True
                 return
             
@@ -271,7 +339,13 @@ class EmotionChatbot:
                 base_model = base_model.cuda()
                 print(f"[LoRA] Base model GPU'ya taşındı")
             
-            tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+            # Tokenizer'ı yükle - önce local'den dene, yoksa base model'den
+            tokenizer_path = lora_path / "tokenizer.json"
+            if tokenizer_path.exists():
+                print(f"[LoRA] Local tokenizer bulundu, yükleniyor...")
+                tokenizer = AutoTokenizer.from_pretrained(str(lora_path))
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(base_model_name)
             
             # Pad token ekle (eğer yoksa)
             if tokenizer.pad_token is None:
@@ -280,11 +354,85 @@ class EmotionChatbot:
             print("[LoRA] Base model yüklendi, LoRA adaptörü ekleniyor...")
             
             # LoRA adaptörünü base model üzerine tak
-            self.lora_model = PeftModel.from_pretrained(
-                base_model,
-                str(lora_path),
-                device_map="auto" if use_gpu else None
-            )
+            # Windows path sorununu çözmek için: local path için from_pretrained yerine load_adapter kullan
+            try:
+                # Önce from_pretrained ile dene
+                lora_path_str = str(lora_path.resolve())
+                self.lora_model = PeftModel.from_pretrained(
+                    base_model,
+                    lora_path_str,
+                    device_map="auto" if use_gpu else None
+                )
+            except Exception as e:
+                # Eğer path validation hatası varsa, manuel yükleme yap
+                error_str = str(e).lower()
+                if "repo id" in error_str or "hfvalidationerror" in error_str or "validation" in error_str:
+                    print(f"[LoRA] Path validation hatası, manuel yükleme deneniyor...")
+                    try:
+                        from peft import PeftConfig
+                        # Config dosyasını oku
+                        import json
+                        with open(adapter_config_path, 'r', encoding='utf-8') as f:
+                            config_dict = json.load(f)
+                        
+                        # PeftModel oluştur (base model + config)
+                        config = PeftConfig.from_dict(config_dict)
+                        self.lora_model = PeftModel(base_model, config, adapter_name="default")
+                        
+                        # Weight dosyasını yükle (adapter_model.safetensors veya lora.safetensors)
+                        if adapter_model_path.exists():
+                            print(f"[LoRA] Weight dosyası yükleniyor: {adapter_model_path.name}")
+                            if str(adapter_model_path).endswith('.safetensors'):
+                                try:
+                                    from safetensors.torch import load_file
+                                    state_dict = load_file(str(adapter_model_path))
+                                    print(f"[LoRA] Safetensors dosyası başarıyla yüklendi")
+                                except ImportError:
+                                    print(f"[LoRA WARNING] safetensors.torch bulunamadı, torch ile deneniyor...")
+                                    import torch
+                                    # .safetensors dosyasını torch.load ile açmaya çalışma, hata verir
+                                    raise ImportError("safetensors kütüphanesi gerekli (.safetensors dosyası için)")
+                            else:
+                                import torch
+                                state_dict = torch.load(str(adapter_model_path), map_location='cpu')
+                            
+                            # PEFT'in beklediği format: adapter_model.safetensors zaten doğru formatta olmalı
+                            # Eğer key'ler base_model.model. ile başlıyorsa olduğu gibi bırak
+                            # Eğer lora_ ile başlıyorsa default. prefix'i ekle
+                            peft_state_dict = {}
+                            for key, value in state_dict.items():
+                                if key.startswith('base_model.model.'):
+                                    # Base model key'leri olduğu gibi bırak
+                                    peft_state_dict[key] = value
+                                elif 'lora_' in key or 'default.' in key:
+                                    # LoRA key'leri - zaten doğru formatta olabilir
+                                    if key.startswith('default.'):
+                                        peft_state_dict[key] = value
+                                    else:
+                                        # default. prefix'i ekle
+                                        peft_state_dict[f'default.{key}'] = value
+                                else:
+                                    # Diğer key'leri de ekle
+                                    peft_state_dict[key] = value
+                            
+                            # State dict'i yükle
+                            print(f"[LoRA] State dict yükleniyor ({len(peft_state_dict)} key)...")
+                            missing_keys, unexpected_keys = self.lora_model.load_state_dict(peft_state_dict, strict=False)
+                            if missing_keys:
+                                print(f"[LoRA WARNING] Eksik keys: {len(missing_keys)} adet (ilk 5: {missing_keys[:5]})")
+                            if unexpected_keys:
+                                print(f"[LoRA WARNING] Beklenmeyen keys: {len(unexpected_keys)} adet (ilk 5: {unexpected_keys[:5]})")
+                            print("[LoRA] Adapter manuel yükleme ile başarıyla yüklendi")
+                        else:
+                            raise Exception(f"Adapter weight dosyası bulunamadı: {adapter_model_path}")
+                    except Exception as e2:
+                        print(f"[ERROR] Manuel yükleme de başarısız oldu: {e2}")
+                        import traceback
+                        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+                        raise e
+                else:
+                    # Diğer hatalar için original hatayı fırlat
+                    raise e
             
             self.lora_tokenizer = tokenizer
             
@@ -652,11 +800,15 @@ Seçilebilecek ruh halleri (sadece bu listeden seç):
                 "ruh_hali": random.choice(["Mutlu", "Üzgün", "Şaşkın"])
             }
         
-        # Duygu sayaçlarını güncelle
+        # Duygu kaydını zaman damgasıyla ekle
         mood_raw = str(emotion_data.get("ruh_hali", ""))
         if mood_raw.strip() in self.emotion_counts:
             self.emotion_counts[mood_raw.strip()] += 1
-            self._save_mood_counts()
+            # Zaman damgalı kayıt ekle
+            self._append_mood_record(mood_raw.strip())
+            print(f"[EMOTION] Duygu kaydedildi: {mood_raw.strip()}")
+        else:
+            print(f"[EMOTION] Duygu kaydedilemedi: '{mood_raw.strip()}' allowed_moods listesinde yok")
         
         # Emoji seçim: mood_emojis.json'dan duyguya göre rastgele
         def normalize_mood(name: str) -> str:
@@ -707,28 +859,44 @@ Seçilebilecek ruh halleri (sadece bu listeden seç):
         def pick_emoji(mood: str) -> Optional[str]:
             """mood_emojis.json'dan duyguya göre rastgele emoji seçer"""
             key = normalize_mood(mood)
+            print(f"[EMOTION] Duygu normalize edildi: '{mood}' -> '{key}'")
             
             # JSON'daki anahtarları direkt kontrol et
             options = MOOD_EMOJIS.get(key)
             if options:
                 try:
-                    return random.choice(options)
-                except Exception:
+                    selected_emoji = random.choice(options)
+                    print(f"[EMOTION] Emoji seçildi: {selected_emoji} (duygu: {key}, seçenekler: {len(options)})")
+                    return selected_emoji
+                except Exception as e:
+                    print(f"[EMOTION] Emoji seçim hatası: {e}")
                     return None
             
             # Fallback: fuzzy matching
+            print(f"[EMOTION] Direkt eşleşme bulunamadı, fuzzy matching deneniyor...")
             for json_key in MOOD_EMOJIS.keys():
                 if json_key.lower() in key.lower() or key.lower() in json_key.lower():
                     options = MOOD_EMOJIS.get(json_key)
                     if options:
                         try:
-                            return random.choice(options)
-                        except Exception:
+                            selected_emoji = random.choice(options)
+                            print(f"[EMOTION] Emoji seçildi (fuzzy): {selected_emoji} (duygu: {key} -> {json_key})")
+                            return selected_emoji
+                        except Exception as e:
+                            print(f"[EMOTION] Fuzzy emoji seçim hatası: {e}")
                             continue
             
+            print(f"[EMOTION] Emoji bulunamadı: {key}")
             return None
         
         emoji = pick_emoji(mood_raw)
+        if emoji:
+            print(f"[EMOTION] Final emoji: {emoji}")
+        else:
+            print(f"[EMOTION] WARNING: Emoji None döndü! Duygu: {mood_raw}")
+            # Fallback: eğer emoji bulunamazsa varsayılan emoji kullan
+            emoji = '🙂'
+            print(f"[EMOTION] Fallback emoji kullanılıyor: {emoji}")
         
         # Konuşma geçmişini kaydet
         self._append_chat_history(user_message, lora_response)
@@ -736,7 +904,7 @@ Seçilebilecek ruh halleri (sadece bu listeden seç):
         # Response format: Frontend'in beklediği format
         return {
             "response": lora_response,  # LoRA cevabı
-            "emoji": emoji,  # Tek emoji
+            "emoji": emoji,  # Tek emoji (mutlaka bir değer olmalı)
             "mood": mood_raw,  # Duygu
             "stats": self.stats,  # İstatistikler
         }
