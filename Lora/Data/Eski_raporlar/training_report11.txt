@@ -1,0 +1,145 @@
+================================================================================
+LoRA EĞİTİM RAPORU
+================================================================================
+
+Oluşturulma Tarihi: 2025-11-02 11:28:06
+
+================================================================================
+MODEL BİLGİLERİ
+================================================================================
+Base Model: ytu-ce-cosmos/turkish-gpt2-medium
+Model Tipi: Turkish GPT-2 Medium (Türkçe için optimize edilmiş GPT-2)
+Fine-tuning Yöntemi: LoRA (Low-Rank Adaptation)
+LoRA Rank (r): 16
+LoRA Alpha: 32
+LoRA Dropout: 0.05
+LoRA Bias: none
+Target Modules: ['c_attn', 'c_proj'] (GPT-2)
+
+================================================================================
+MODEL İSTATİSTİKLERİ
+================================================================================
+Toplam Parametre: 359,148,544
+Eğitilebilir Parametre: 4,325,376
+Dondurulmuş Parametre: 354,823,168
+Eğitilebilir Oran: 1.20%
+
+================================================================================
+DATASET BİLGİLERİ
+================================================================================
+Veri Dosyası: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Data\final.json
+Toplam Diyalog: 7,253
+Train Set: 6,527 örnek
+Validation Set: 726 örnek (10.0%)
+Ortalama Uzunluk: 100.32 karakter
+Min: 51, Max: 224
+
+================================================================================
+EĞİTİM BİLGİLERİ
+================================================================================
+Başlangıç: 2025-11-02 10:41:37
+Bitiş: 2025-11-02 11:27:54
+Toplam Süre: 0:46:17.025269
+
+Epoch Sayısı: 4
+Batch Size: 2
+Gradient Accumulation Steps: 16
+Effective Batch Size: 32
+Learning Rate: 2e-4
+LR Scheduler: cosine
+Warmup Ratio: 0.1
+GPU Kullanımı: Evet
+Mixed Precision: bf16 (RTX 4060 için optimize edilmiş)
+GPU: NVIDIA GeForce RTX 4060 Laptop GPU
+CUDA Version: 12.1
+GPU Memory: 8.00 GB
+
+================================================================================
+EĞİTİM METRİKLERİ
+================================================================================
+Train Metrikleri:
+  train_runtime: 2776.279700
+  train_samples_per_second: 9.404000
+  train_steps_per_second: 0.294000
+  total_flos: 24593429220556800.000000
+  train_loss: 2.208462
+  epoch: 4.000000
+
+
+================================================================================
+TEST SONUÇLARI
+================================================================================
+Test Örnek Sayısı: 5
+
+
+--- TEST 1 ---
+Prompt: user: Bugün çok mutluyum! assistant:
+
+Tam Çıktı:
+user: Bugün çok mutluyum! assistant: Ne güzel, bi kahve içsek mi? İyi gelir. Çok keyifliydi o günler. Biraz da hava alsak keşke biz de. Keyfini çıkar şimdi. Bi ara gel bana ben de anlatırım seni. Merak ettim. Bazen insan sadece kendini düşünür ya. Ben de öyle yapıyorum işte. Gel beraber kahvelerimizi içeriz. Muhabbet ederiz belki. Canım sıkılıyo mu hiç. Öyle boşverin beni. Hep birlikte yaparız bunu. Benim de keyfim yerindedir hep. Sıkma kafanı,
+
+Sadece Yanıt:
+Ne güzel, bi kahve içsek mi? İyi gelir. Çok keyifliydi o günler. Biraz da hava alsak keşke biz de. Keyfini çıkar şimdi. Bi ara gel bana ben de anlatırım seni. Merak ettim. Bazen insan sadece kendini düşünür ya. Ben de öyle yapıyorum işte. Gel beraber kahvelerimizi içeriz. Muhabbet ederiz belki. Canım sıkılıyo mu hiç. Öyle boşverin beni. Hep birlikte yaparız bunu. Benim de keyfim yerindedir hep. Sıkma kafanı,
+--------------------------------------------------------------------------------
+
+--- TEST 2 ---
+Prompt: user: İş yerinde sorun yaşıyorum. assistant:
+
+Tam Çıktı:
+user: İş yerinde sorun yaşıyorum. assistant: Takma kafana, çözülmez bu işler öyle şeyler. ‍ İletişimini koparmazsan düzelir. Çok mu zor? İyi dinle kendini. Başka bir işle uğraşsana biraz. Zor değil. Sıkıntı yok. Biraz daha zaman alırsın sen yeter ki. ‌ Boşver beya. Kolay gelsin sana. Sakin ol sonra geçer o iş. ‏ Olur arada bazen. Bazen de olur böyle şeyler. Ben hallederim şimdi. Ama dikkat et kendine. Sabretmen lazım senin.
+
+Sadece Yanıt:
+Takma kafana, çözülmez bu işler öyle şeyler. ‍ İletişimini koparmazsan düzelir. Çok mu zor? İyi dinle kendini. Başka bir işle uğraşsana biraz. Zor değil. Sıkıntı yok. Biraz daha zaman alırsın sen yeter ki. ‌ Boşver beya. Kolay gelsin sana. Sakin ol sonra geçer o iş. ‏ Olur arada bazen. Bazen de olur böyle şeyler. Ben hallederim şimdi. Ama dikkat et kendine. Sabretmen lazım senin.
+--------------------------------------------------------------------------------
+
+--- TEST 3 ---
+Prompt: user: Yeni bir hobi edindim. assistant:
+
+Tam Çıktı:
+user: Yeni bir hobi edindim. assistant: Hangi müzik aleti çalıyorsun? Bence harika bi seçim olur. Evde de yapabiliriz şimdi, ne dersin? Müzik ruhun gıdasıdır bence. İyi eğlenceler şimdiden. Ben geldim sana daha yeni şeyler keşfettim demek için. Bi kahve içeriz beraber. Sohbet ederiz hep birlikte. Çok keyifli olurdu eminim. Dinlenirsin ben gelmem ama en çok keyif alırım o zaman bu tarz şeylerin içinde. Birazdan bana da uğrarmısın acaba. Kahve keyfi yaparız. Canı sıkılmaz mı hiç merak ettim doğrusu. Muhabbet şahane
+
+Sadece Yanıt:
+Hangi müzik aleti çalıyorsun? Bence harika bi seçim olur. Evde de yapabiliriz şimdi, ne dersin? Müzik ruhun gıdasıdır bence. İyi eğlenceler şimdiden. Ben geldim sana daha yeni şeyler keşfettim demek için. Bi kahve içeriz beraber. Sohbet ederiz hep birlikte. Çok keyifli olurdu eminim. Dinlenirsin ben gelmem ama en çok keyif alırım o zaman bu tarz şeylerin içinde. Birazdan bana da uğrarmısın acaba. Kahve keyfi yaparız. Canı sıkılmaz mı hiç merak ettim doğrusu. Muhabbet şahane
+--------------------------------------------------------------------------------
+
+--- TEST 4 ---
+Prompt: user: Çok yorgunum. assistant:
+
+Tam Çıktı:
+user: Çok yorgunum. assistant: Bi kahve içsek mi? Dinlenirsin belki biraz. İyi gelir sana. Belki kitap falan okuya bilirsin, iyi gelir. Uykum da var şimdi ben de öyle yapmak istiyorum. ‍ Ne kadar güzel olur. En azından dinlenirsin. Yorma kendini. Kendine dikkat et birazcık daha fazla. Başka bi şey düşünme. ‏ Keyfini çıkar canım. Gel beraber kafa dinleyelim. Yat uyu artık. Biraz kendine zaman ayır sonra. Sen ne yaparsan yap. Olur böyle şeyler. Tak
+
+Sadece Yanıt:
+Bi kahve içsek mi? Dinlenirsin belki biraz. İyi gelir sana. Belki kitap falan okuya bilirsin, iyi gelir. Uykum da var şimdi ben de öyle yapmak istiyorum. ‍ Ne kadar güzel olur. En azından dinlenirsin. Yorma kendini. Kendine dikkat et birazcık daha fazla. Başka bi şey düşünme. ‏ Keyfini çıkar canım. Gel beraber kafa dinleyelim. Yat uyu artık. Biraz kendine zaman ayır sonra. Sen ne yaparsan yap. Olur böyle şeyler. Tak
+--------------------------------------------------------------------------------
+
+--- TEST 5 ---
+Prompt: user: Harika bir haber aldım! assistant:
+
+Tam Çıktı:
+user: Harika bir haber aldım! assistant: Aaa ne güzel! Hemen al, biz de okuyalım. Çok sevindim senin adına. Merak ettim şimdi. Belki bana da çıkarırsın. Heyecanlandım valla. İyi haberlerini bekliyoruz canm. Mutlu ol hep! Sevgilerimle canım benim. Sağlıcakla kal kendine iyi bak. ❤️ Neşeli akşamlar dilerim size çok. ‍
+Bi sürü mutlu haberin var demek ki. Ne kadar doğru bi karar aldığına ben eminim zaten. Başarılar diliyorum sana. Keyifler yerindedir umarım.
+
+Sadece Yanıt:
+Aaa ne güzel! Hemen al, biz de okuyalım. Çok sevindim senin adına. Merak ettim şimdi. Belki bana da çıkarırsın. Heyecanlandım valla. İyi haberlerini bekliyoruz canm. Mutlu ol hep! Sevgilerimle canım benim. Sağlıcakla kal kendine iyi bak. ❤️ Neşeli akşamlar dilerim size çok. ‍
+Bi sürü mutlu haberin var demek ki. Ne kadar doğru bi karar aldığına ben eminim zaten. Başarılar diliyorum sana. Keyifler yerindedir umarım.
+--------------------------------------------------------------------------------
+
+================================================================================
+KAYIT BİLGİLERİ
+================================================================================
+Model Klasörü: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Model\lora-turkish-gpt2-medium
+Rapor Dosyası: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Data\training_report.txt
+
+================================================================================
+NOTLAR
+================================================================================
+- Model LoRA adapter ağırlıklarını içerir
+- Base model (ytu-ce-cosmos/turkish-gpt2-medium) ayrıca indirilmelidir
+- Inference için base model + LoRA adapter birlikte kullanılmalıdır
+- Model dosyaları: adapter_config.json, adapter_model.bin
+- Turkish GPT-2 Medium Türkçe için özel olarak eğitilmiş modeldir, generation için idealdir
+- RTX 4060 için bf16 mixed precision kullanılmıştır
+
+================================================================================
+RAPOR SONU
+================================================================================

@@ -1,0 +1,138 @@
+================================================================================
+LoRA EĞİTİM RAPORU
+================================================================================
+
+Oluşturulma Tarihi: 2025-11-01 19:08:43
+
+================================================================================
+MODEL BİLGİLERİ
+================================================================================
+Base Model: microsoft/DialoGPT-large
+Model Tipi: DialoGPT Large (Conversational AI - GPT-2 tabanlı)
+Fine-tuning Yöntemi: LoRA (Low-Rank Adaptation)
+LoRA Rank (r): 16
+LoRA Alpha: 32
+LoRA Dropout: 0.1
+Target Modules: ['c_attn', 'c_proj'] (GPT-2/DialoGPT)
+
+================================================================================
+MODEL İSTATİSTİKLERİ
+================================================================================
+Toplam Parametre: 782,140,160
+Eğitilebilir Parametre: 8,110,080
+Dondurulmuş Parametre: 774,030,080
+Eğitilebilir Oran: 1.04%
+
+================================================================================
+DATASET BİLGİLERİ
+================================================================================
+Veri Dosyası: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Data\final.txt
+Toplam Diyalog: 1,020
+Train Set: 918 örnek
+Validation Set: 102 örnek (10.0%)
+Ortalama Uzunluk: 104.50 karakter
+Min: 54, Max: 224
+
+================================================================================
+EĞİTİM BİLGİLERİ
+================================================================================
+Başlangıç: 2025-11-01 17:30:23
+Bitiş: 2025-11-01 19:08:28
+Toplam Süre: 1:38:04.921359
+
+Epoch Sayısı: 5
+Batch Size: 4
+Gradient Accumulation Steps: 4
+Effective Batch Size: 16
+Warmup Steps: 50
+GPU Kullanımı: Evet
+GPU: NVIDIA GeForce RTX 4060 Laptop GPU
+CUDA Version: 12.1
+GPU Memory: 8.00 GB
+
+================================================================================
+EĞİTİM METRİKLERİ
+================================================================================
+Train Metrikleri:
+  train_runtime: 5884.261200
+  train_samples_per_second: 0.780000
+  train_steps_per_second: 0.048000
+  total_flos: 10019359288197120.000000
+  train_loss: 6.606478
+  epoch: 4.956522
+
+
+================================================================================
+TEST SONUÇLARI
+================================================================================
+Test Örnek Sayısı: 5
+
+
+--- TEST 1 ---
+Prompt: user: Bugün çok mutluyum! assistant:
+
+Tam Çıktı:
+user: Bugün çok mutluyum! assistant: Yayekin buğam. �ılöt yapar ahmim gazadik birkendan dukla baket i kunmi sardine de vari ya omebada etti huşer gela almadiyat etizur mi geckler olac zaman lana vezalldir bi
+
+Sadece Yanıt:
+Yayekin buğam. �ılöt yapar ahmim gazadik birkendan dukla baket i kunmi sardine de vari ya omebada etti huşer gela almadiyat etizur mi geckler olac zaman lana vezalldir bi
+--------------------------------------------------------------------------------
+
+--- TEST 2 ---
+Prompt: user: İş yerinde sorun yaşıyorum. assistant:
+
+Tam Çıktı:
+user: İş yerinde sorun yaşıyorum. assistant: Ahok gçkkim biri bi mi şor kenlar, miyo olsin sağincta çrsalm! 🞶ur dukla i siklag lahan nekket buzesar enemeymaylana bakler olma dezine cüluye uzelta hölen eyermi
+
+Sadece Yanıt:
+Ahok gçkkim biri bi mi şor kenlar, miyo olsin sağincta çrsalm! 🞶ur dukla i siklag lahan nekket buzesar enemeymaylana bakler olma dezine cüluye uzelta hölen eyermi
+--------------------------------------------------------------------------------
+
+--- TEST 3 ---
+Prompt: user: Yeni bir hobi edindim. assistant:
+
+Tam Çıktı:
+user: Yeni bir hobi edindim. assistant: Kisi neyi deşın bi yakum! �üzaplarçekler, cana olur cazmahlsin kun ganoodine iğrat ßok senyi sahan eklarzelmenem enana liyamu otrdeniz aralayaltluyanet geldas elikador
+
+Sadece Yanıt:
+Kisi neyi deşın bi yakum! �üzaplarçekler, cana olur cazmahlsin kun ganoodine iğrat ßok senyi sahan eklarzelmenem enana liyamu otrdeniz aralayaltluyanet geldas elikador
+--------------------------------------------------------------------------------
+
+--- TEST 4 ---
+Prompt: user: Çok yorgunum. assistant:
+
+Tam Çıktı:
+user: Çok yorgunum. assistant: ehm kadık! � kanur buye odan bi ya gazinde ah, elsi olalatyler içeklar neftin luktir uşu elenim sana hrufte döğrüzineyi leyla na ba arabuyormi mi ŧehmadan igar
+
+Sadece Yanıt:
+ehm kadık! � kanur buye odan bi ya gazinde ah, elsi olalatyler içeklar neftin luktir uşu elenim sana hrufte döğrüzineyi leyla na ba arabuyormi mi ŧehmadan igar
+--------------------------------------------------------------------------------
+
+--- TEST 5 ---
+Prompt: user: Harika bir haber aldım! assistant:
+
+Tam Çıktı:
+user: Harika bir haber aldım! assistant: Ay kadim yuği neyorum.öta biya gazaymi dolma ola baklar buşekin sana yaatine olmadan hani ala udiyor benemoken,ülsun uno dezeye enada miapizkamnummete gelda etta ihanbiler
+
+Sadece Yanıt:
+Ay kadim yuği neyorum.öta biya gazaymi dolma ola baklar buşekin sana yaatine olmadan hani ala udiyor benemoken,ülsun uno dezeye enada miapizkamnummete gelda etta ihanbiler
+--------------------------------------------------------------------------------
+
+================================================================================
+KAYIT BİLGİLERİ
+================================================================================
+Model Klasörü: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Model\lora_model
+Rapor Dosyası: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Data\training_report.txt
+
+================================================================================
+NOTLAR
+================================================================================
+- Model LoRA adapter ağırlıklarını içerir
+- Base model (microsoft/DialoGPT-large) ayrıca indirilmelidir
+- Inference için base model + LoRA adapter birlikte kullanılmalıdır
+- Model dosyaları: adapter_config.json, adapter_model.bin
+- DialoGPT Large conversational AI için tasarlanmış, generation için idealdir
+
+================================================================================
+RAPOR SONU
+================================================================================
