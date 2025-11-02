@@ -21,3 +21,16 @@ pypdf==4.3.1
 transformers==4.45.2
 sentencepiece==0.2.0
 safetensors==0.4.5
+
+# LoRA Fine-Tuning dependencies
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+peft>=0.6.0  # Parameter Efficient Fine-Tuning (LoRA için)
+datasets>=2.14.0  # Hugging Face datasets
+accelerate>=0.24.0  # Training hızlandırma ve GPU yönetimi (CPU'da da çalışır)
+numpy>=1.24.0  # Numerik işlemler (genellikle torch ile gelir ama ek güvenlik için)
+hf_xet
+
+# NOT: GPU kullanmak için PyTorch CUDA versiyonu kurulmalıdır:
+# CUDA 12.1: pip install torch --index-url https://download.pytorch.org/whl/cu121
+# CUDA 11.8: pip install torch --index-url https://download.pytorch.org/whl/cu118
+# Script otomatik olarak GPU varsa kullanır, yoksa CPU'da çalışır (daha yavaş)
