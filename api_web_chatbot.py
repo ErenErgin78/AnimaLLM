@@ -37,31 +37,35 @@ app = FastAPI(title="CHAIN SYSTEM - Akıllı Chatbot Sistemi", version="3.0.0")
 # LangChain LLM instance - Fallback mekanizması ile
 def get_llm():
     """OpenAI API geçersizse Gemini'yi kullan"""
+    import warnings
+    import logging
+    
+    # Uyarıları bastır
+    warnings.filterwarnings("ignore")
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # TensorFlow uyarılarını bastır
+    os.environ['GRPC_VERBOSITY'] = 'ERROR'  # gRPC uyarılarını bastır
+    logging.getLogger("transformers").setLevel(logging.ERROR)
+    logging.getLogger("google").setLevel(logging.ERROR)
+    logging.getLogger("google.api_core").setLevel(logging.ERROR)
+    logging.getLogger("absl").setLevel(logging.ERROR)
+    
     try:
         # OpenAI API'yi test et
-        print("[LLM] OpenAI API test ediliyor...")
         test_llm = OpenAI(temperature=0.1, max_tokens=1000, request_timeout=15)
         # Basit bir test çağrısı yap
-        test_result = test_llm.invoke("test")
-        print(f"[LLM] OpenAI test sonucu: {test_result}")
+        test_llm.invoke("test")
         print("[LLM] OpenAI API kullanılıyor")
         return test_llm
-    except Exception as e:
-        print(f"[LLM] OpenAI API hatası: {e}")
+    except Exception:
+        # OpenAI API key kullanılamıyor
+        print("[LLM] OpenAI API key kullanılamıyor")
         try:
             # Gemini API'yi test et - sadece API key ile
-            print("[LLM] Gemini API test ediliyor...")
             import google.generativeai as genai
             api_key = os.getenv("GEMINI_API_KEY")
             if not api_key:
                 raise Exception("GEMINI_API_KEY bulunamadı")
             genai.configure(api_key=api_key)
-            
-            # LangChain olmadan direkt Gemini kullan
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            # Test çağrısı yap
-            response = model.generate_content("test")
-            print(f"[LLM] Gemini test sonucu: {response.text}")
             
             # LangChain wrapper oluştur - Google Cloud credentials olmadan
             from langchain_google_genai import ChatGoogleGenerativeAI
@@ -74,9 +78,9 @@ def get_llm():
             )
             print("[LLM] Gemini API kullanılıyor")
             return gemini_llm
-        except Exception as gemini_error:
-            print(f"[LLM] Gemini API hatası: {gemini_error}")
-            raise Exception(f"API hatası - OpenAI: {e}, Gemini: {gemini_error}")
+        except Exception:
+            print("[LLM] Gemini API key kullanılamıyor")
+            raise Exception("Hiçbir API key kullanılamıyor")
 
 llm = get_llm()
 
@@ -193,6 +197,14 @@ def _summarize_text_if_needed(text: str, estimated_tokens: int, token_threshold:
 # RAG modelini asenkron olarak önceden yükle
 print("[CHAIN SYSTEM] RAG modeli asenkron olarak yükleniyor...")
 rag_service.preload_model_async()
+
+# LoRA modelini asenkron olarak önceden yükle - Global EmotionChatbot instance oluştur
+print("[CHAIN SYSTEM] LoRA modeli asenkron olarak yükleniyor...")
+# LoRA yüklemesi için EmotionChatbot instance'ı oluştur (client=None, Gemini kullanacak)
+# Chat için lazım olana kadar beklenmez, sadece LoRA yüklemesi için
+if chatbot_instance is None:
+    chatbot_instance = EmotionChatbot()  # client=None, Gemini kullanacak
+chatbot_instance.preload_lora_model_async()
 
 # Güvenlik sabitleri
 MAX_MESSAGE_LENGTH = 2000  # Maksimum mesaj uzunluğu
@@ -456,19 +468,14 @@ def create_emotion_chain():
                 )
                 chatbot_instance = EmotionChatbot(client)
                 print("[EMOTION] OpenAI API kullanılıyor")
-            except Exception as e:
-                print(f"[EMOTION] OpenAI API hatası: {e}")
-                # Gemini kullan
+            except Exception:
+                # OpenAI API key kullanılamıyor, Gemini kullan
                 chatbot_instance = EmotionChatbot()  # client=None, Gemini kullanacak
                 print("[EMOTION] Gemini API kullanılıyor")
         
         # Memory sistemi ile önceki konuşma geçmişi otomatik olarak yönetiliyor
         
         result = chatbot_instance.chat(user_message)
-        stats = {
-            "requests": chatbot_instance.stats["requests"],
-            "last_request_at": chatbot_instance.stats["last_request_at"],
-        }
         
         # Memory'ye yeni konuşmayı kaydet
         memory.save_context(
@@ -476,13 +483,19 @@ def create_emotion_chain():
             {"output": result.get("response", "")}
         )
         
-        out = {"response": result.get("response", ""), "stats": stats}
-        if "first_emoji" in result:
-            out["first_emoji"] = result["first_emoji"]
-        if "second_emoji" in result:
-            out["second_emoji"] = result["second_emoji"]
-        if "request_debug" in result:
-            out["request_debug"] = result["request_debug"]
+        # Yeni emotion_system formatına uygun response döndür
+        # Format: {"response": lora_response, "emoji": emoji, "mood": mood, "stats": stats}
+        out = {
+            "response": result.get("response", ""),
+            "stats": result.get("stats", {}),
+        }
+        
+        # Yeni format alanları ekle
+        if "emoji" in result:
+            out["emoji"] = result["emoji"]
+        if "mood" in result:
+            out["mood"] = result["mood"]
+        
         return out
     
     return emotion_processor

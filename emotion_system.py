@@ -1,9 +1,11 @@
 """
-Duygu Analizi Sistemi
-====================
+Duygu Analizi Sistemi - LoRA Model Entegrasyonu
+===============================================
 
-Bu modül duygu analizi, sohbet ve istatistik işlemlerini yönetir.
-Ana chatbot sınıfı ve duygu işleme fonksiyonlarını içerir.
+Bu modül LoRA model ile metin üretimi ve LLM ile duygu analizi yapar.
+- LoRA modelinden kullanıcı mesajına cevap üretir
+- LLM'den (Gemini/GPT) duygu analizi yapar
+- mood_emojis.json'dan duyguya göre emoji seçer
 """
 
 import os
@@ -15,6 +17,15 @@ from typing import Any, Dict, Optional
 from datetime import datetime
 from pathlib import Path
 from openai import OpenAI
+
+# LoRA model için gerekli importlar
+try:
+    from transformers import GPT2LMHeadModel, AutoTokenizer
+    from peft import PeftModel
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+    print("[WARNING] transformers veya peft kütüphaneleri bulunamadı. LoRA model kullanılamayacak.")
 
 # Güvenlik sabitleri
 MAX_EMOTION_MESSAGE_LENGTH = 1000
@@ -52,48 +63,56 @@ except Exception:
 
 class EmotionChatbot:
     def __init__(self, client: OpenAI = None) -> None:
+        """Emotion chatbot başlatır - LoRA model ve LLM (Gemini/GPT) hazırlar"""
         self.client = client
         self.use_gemini = False
         if client is None:
             self.use_gemini = True
-            # Gemini API'yi yapılandır - sadece API key ile
+            # Gemini API'yi yapılandır - uyarıları bastır
             import google.generativeai as genai
+            import warnings
+            import logging
+            warnings.filterwarnings("ignore", category=UserWarning)
+            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+            os.environ['GRPC_VERBOSITY'] = 'ERROR'
+            logging.getLogger("google").setLevel(logging.ERROR)
+            logging.getLogger("google.api_core").setLevel(logging.ERROR)
+            logging.getLogger("absl").setLevel(logging.ERROR)
             genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        self.messages: list[Dict[str, Any]] = []
+        
         self.stats: Dict[str, Any] = {
             "requests": 0,
             "last_request_at": None,
         }
         self.allowed_moods = [
-            "Mutlu", "Üzgün", "Öfkeli", "Şaşkın", "Utangaç",
-            "Endişeli", "Yorgun", "Gururlu", "Çaresiz", "Flörtöz"
+            "Mutlu", "Üzgün", "Öfkeli", "Şaşkın", "Utanmış",
+            "Endişeli", "Gülümseyen", "Flörtöz", "Sorgulayıcı", "Yorgun"
         ]
         self.emotion_counts: Dict[str, int] = {m: 0 for m in self.allowed_moods}
+        
         # Kalıcı sayaçları yükle
         persisted = self._load_mood_counts()
         if persisted:
-            # Sadece bilinen anahtarları al
             for k, v in persisted.items():
                 if k in self.emotion_counts and isinstance(v, int):
                     self.emotion_counts[k] = v
+        
+        # LoRA model ve tokenizer için lazy loading
+        self.lora_model = None
+        self.lora_tokenizer = None
+        self._lora_loaded = False
+        self._lora_loading = False  # Asenkron yükleme durumu
 
     def _sanitize_emotion_input(self, text: str) -> str:
         """Duygu sistemi için güvenli input sanitization"""
         if not text:
             return ""
-        
-        # HTML escape
         text = html.escape(text, quote=True)
-        
-        # Tehlikeli pattern'leri kontrol et
         for pattern in DANGEROUS_EMOTION_PATTERNS:
             if re.search(pattern, text, re.IGNORECASE):
                 print(f"[SECURITY] Duygu sisteminde tehlikeli pattern: {pattern}")
                 return "[Güvenlik nedeniyle mesaj filtrelendi]"
-        
-        # Fazla boşlukları temizle
         text = re.sub(r'\s+', ' ', text).strip()
-        
         return text
 
     def _validate_emotion_message_length(self, text: str) -> bool:
@@ -113,9 +132,6 @@ class EmotionChatbot:
                     prompt_parts.append(f"Kullanıcı: {content}")
                 elif role == "assistant":
                     prompt_parts.append(f"Asistan: {content}")
-                elif role == "function":
-                    function_name = msg.get("name", "")
-                    prompt_parts.append(f"Fonksiyon ({function_name}): {content}")
         return "\n".join(prompt_parts)
 
     def _load_mood_counts(self) -> Dict[str, int]:
@@ -153,22 +169,351 @@ class EmotionChatbot:
             pass
 
     def get_functions(self) -> list[Dict[str, Any]]:
-        """Emotion sistemi için function-calling kullanılmıyor (istatistik ayrı sistemde)."""
+        """Emotion sistemi için function-calling kullanılmıyor"""
         return []
 
-    # İstatistik fonksiyonları bu sistemden kaldırıldı; StatisticSystem kullanılacak.
+    def preload_lora_model_async(self) -> None:
+        """Asenkron olarak LoRA modelini önceden yükle (program başlatıldığında)"""
+        if self._lora_loading or self._lora_loaded:
+            return
+        
+        self._lora_loading = True
+        print("[EMOTION] Asenkron LoRA model yükleme başlatılıyor...")
+        
+        import threading
+        def load_in_background():
+            try:
+                self._load_lora_model()
+                print("[EMOTION] LoRA model asenkron olarak yüklendi ✅")
+            except Exception as e:
+                print(f"[EMOTION] LoRA model yükleme hatası: {e}")
+                import traceback
+                print(f"[EMOTION] Traceback: {traceback.format_exc()}")
+            finally:
+                self._lora_loading = False
+        
+        thread = threading.Thread(target=load_in_background, daemon=True)
+        thread.start()
+    
+    def _load_lora_model(self):
+        """LoRA modeli yükler - Base model üzerine adaptör takılır"""
+        if self._lora_loaded:
+            return
+        
+        if not TRANSFORMERS_AVAILABLE:
+            print("[ERROR] LoRA model yüklenemedi: transformers/peft kütüphaneleri bulunamadı")
+            self._lora_loaded = True
+            return
+        
+        try:
+            import torch
+            
+            # LoRA adaptör yolunu dinamik olarak belirle - main klasörü kullan
+            base_path = Path(__file__).parent
+            lora_path = base_path / "Lora" / "Model" / "main"
+            
+            if not lora_path.exists():
+                print(f"[ERROR] LoRA adaptör yolu bulunamadı: {lora_path}")
+                self._lora_loaded = True
+                return
+            
+            # Adapter dosyalarını dinamik olarak kontrol et
+            # adapter_config.json ve lora.safetensors (veya adapter_model.safetensors) dosyalarını ara
+            adapter_config_path = lora_path / "adapter_config.json"
+            
+            # Model dosyasını kontrol et - önce lora.safetensors, sonra adapter_model.safetensors
+            adapter_model_path = lora_path / "lora.safetensors"
+            if not adapter_model_path.exists():
+                adapter_model_path = lora_path / "adapter_model.safetensors"
+            
+            # Eğer adapter_config.json yoksa, "en iyi" klasöründen al (fallback)
+            if not adapter_config_path.exists():
+                fallback_config_path = base_path / "Lora" / "Model" / "en iyi" / "adapter_config.json"
+                if fallback_config_path.exists():
+                    print(f"[LoRA] adapter_config.json main klasöründe bulunamadı, 'en iyi' klasöründen kullanılıyor")
+                    # Config'i main klasörüne kopyala veya doğrudan kullan
+                    # PeftModel.from_pretrained zaten config dosyasını kendi bulabilir
+                    # Ama en güvenlisi main klasörüne kopyalamak
+                    import shutil
+                    try:
+                        shutil.copy2(fallback_config_path, adapter_config_path)
+                        print(f"[LoRA] adapter_config.json 'en iyi' klasöründen main klasörüne kopyalandı")
+                    except Exception as e:
+                        print(f"[WARNING] adapter_config.json kopyalanamadı: {e}")
+                        # Fallback olarak "en iyi" klasörünü kullan
+                        lora_path = base_path / "Lora" / "Model" / "en iyi"
+                        adapter_config_path = lora_path / "adapter_config.json"
+                        adapter_model_path = lora_path / "adapter_model.safetensors"
+            
+            if not adapter_config_path.exists():
+                print(f"[ERROR] adapter_config.json bulunamadı: {lora_path}")
+                self._lora_loaded = True
+                return
+            
+            if not adapter_model_path.exists():
+                print(f"[ERROR] LoRA model dosyası bulunamadı (lora.safetensors veya adapter_model.safetensors): {lora_path}")
+                self._lora_loaded = True
+                return
+            
+            print(f"[LoRA] Base model yükleniyor: ytu-ce-cosmos/turkish-gpt2-medium")
+            print(f"[LoRA] Adaptör yolu: {lora_path}")
+            
+            # Base model ve tokenizer'ı yükle
+            base_model_name = "ytu-ce-cosmos/turkish-gpt2-medium"
+            use_gpu = torch.cuda.is_available()
+            
+            base_model = GPT2LMHeadModel.from_pretrained(
+                base_model_name,
+                torch_dtype=torch.float16 if use_gpu else torch.float32
+            )
+            
+            if use_gpu:
+                base_model = base_model.cuda()
+                print(f"[LoRA] Base model GPU'ya taşındı")
+            
+            tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+            
+            # Pad token ekle (eğer yoksa)
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token if hasattr(tokenizer, 'eos_token') and tokenizer.eos_token else tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+            
+            print("[LoRA] Base model yüklendi, LoRA adaptörü ekleniyor...")
+            
+            # LoRA adaptörünü base model üzerine tak
+            self.lora_model = PeftModel.from_pretrained(
+                base_model,
+                str(lora_path),
+                device_map="auto" if use_gpu else None
+            )
+            
+            self.lora_tokenizer = tokenizer
+            
+            # Model tipini ve LoRA durumunu kontrol et
+            if hasattr(self.lora_model, 'peft_config'):
+                print(f"[LoRA] LoRA adaptörü başarıyla eklendi")
+                print(f"[LoRA] PEFT config: {list(self.lora_model.peft_config.keys())}")
+            else:
+                print("[WARNING] LoRA adaptörü eklenmiş gibi görünmüyor, PEFT config bulunamadı")
+            
+            self.lora_model.eval()  # Inference modu
+            self._lora_loaded = True
+            
+            # Model bilgilerini yazdır
+            if use_gpu:
+                print(f"[LoRA] Model device: {next(self.lora_model.parameters()).device}")
+            
+            print("[LoRA] Model başarıyla yüklendi ve hazır")
+            
+        except Exception as e:
+            print(f"[ERROR] LoRA model yükleme hatası: {e}")
+            import traceback
+            print(f"[ERROR] Traceback: {traceback.format_exc()}")
+            self._lora_loaded = True
+    
+    def _generate_with_lora(self, prompt: str, max_new_tokens: int = 40) -> str:
+        """LoRA modelinden metin üretir - sadece kullanıcı mesajını kullanır"""
+        if not TRANSFORMERS_AVAILABLE or self.lora_model is None or self.lora_tokenizer is None:
+            return ""
+        
+        try:
+            import torch
+            import re
+            
+            # Prompt'u tokenize et
+            model_max_len = getattr(self.lora_tokenizer, 'model_max_length', 512)
+            safe_max_length = min(512, model_max_len) if model_max_len < 10000 else 512
+            
+            encoded = self.lora_tokenizer(
+                prompt,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=safe_max_length
+            )
+            input_ids = encoded.input_ids
+            attention_mask = encoded.attention_mask
+            input_length = input_ids.shape[-1]
+            
+            # GPU'ya taşı (varsa)
+            if torch.cuda.is_available():
+                input_ids = input_ids.cuda()
+                attention_mask = attention_mask.cuda()
+            else:
+                device = None
+                if hasattr(self.lora_model, 'device'):
+                    device = self.lora_model.device
+                elif hasattr(self.lora_model, 'base_model'):
+                    if hasattr(self.lora_model.base_model, 'device'):
+                        device = self.lora_model.base_model.device
+                
+                if device is not None:
+                    input_ids = input_ids.to(device)
+                    attention_mask = attention_mask.to(device)
+            
+            # Token ID'lerini güvenli şekilde belirle
+            if self.lora_tokenizer.pad_token_id is not None:
+                pad_token_id = int(self.lora_tokenizer.pad_token_id)
+            elif self.lora_tokenizer.eos_token_id is not None:
+                pad_token_id = int(self.lora_tokenizer.eos_token_id)
+            else:
+                pad_token_id = 0
+            
+            if self.lora_tokenizer.eos_token_id is not None:
+                eos_token_id = int(self.lora_tokenizer.eos_token_id)
+            elif self.lora_tokenizer.pad_token_id is not None:
+                eos_token_id = int(self.lora_tokenizer.pad_token_id)
+            else:
+                eos_token_id = pad_token_id
+            
+            # Text generation parametreleri
+            min_length_value = input_length + 3
+            max_possible_length = safe_max_length if safe_max_length < 10000 else 512
+            min_length_value = min(min_length_value, max_possible_length)
+            
+            with torch.no_grad():
+                outputs = self.lora_model.generate(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    max_new_tokens=int(max_new_tokens),
+                    min_length=int(min_length_value),
+                    do_sample=True,
+                    repetition_penalty=float(1.2),
+                    no_repeat_ngram_size=int(0),
+                    top_k=int(50),
+                    top_p=float(0.95),
+                    temperature=float(0.8),
+                    pad_token_id=int(pad_token_id),
+                    eos_token_id=int(eos_token_id)
+                )
+            
+            # Sadece modelin ürettiği yanıtı al (prompt'u çıkar)
+            response_ids = outputs[0][input_ids.shape[-1]:]
+            generated_response = self.lora_tokenizer.decode(response_ids, skip_special_tokens=True)
+            
+            # EOS token'dan sonrasını temizle
+            if self.lora_tokenizer.eos_token:
+                generated_response = generated_response.split(self.lora_tokenizer.eos_token)[0].strip()
+            
+            generated_text = generated_response
+            
+            # Post-processing: "assistant:" ve "user:" öneklerini temizle
+            assistant_match = re.search(r'assistant\s*:\s*', generated_text, flags=re.IGNORECASE)
+            if assistant_match:
+                generated_text = generated_text[assistant_match.end():].strip()
+            
+            user_match = re.search(r'user\s*:\s*', generated_text, flags=re.IGNORECASE)
+            if user_match:
+                generated_text = generated_text[user_match.end():].strip()
+            
+            # Prompt içeriyorsa temizle
+            if prompt.strip() in generated_text:
+                generated_text = generated_text.replace(prompt.strip(), "", 1).strip()
+            
+            # Virgülle başlayan metinleri temizle
+            if generated_text.startswith(','):
+                parts = generated_text.split(',', 1)
+                if len(parts) > 1:
+                    generated_text = parts[1].strip()
+                else:
+                    generated_text = generated_text.lstrip(',').strip()
+            
+            # Prompt'un ilk birkaç kelimesini kontrol et ve varsa çıkar
+            prompt_words = prompt.strip().split()[:5]
+            if len(prompt_words) >= 3:
+                prompt_prefix = ' '.join(prompt_words)
+                if generated_text.startswith(prompt_prefix):
+                    generated_text = generated_text[len(prompt_prefix):].strip()
+            
+            # Emoji sayısını sınırla (en fazla 1 emoji)
+            generated_text = self._limit_emoji_count(generated_text, max_emojis=1)
+            
+            return generated_text
+            
+        except Exception as e:
+            print(f"[ERROR] LoRA metin üretme hatası: {e}")
+            return ""
+    
+    def _limit_emoji_count(self, text: str, max_emojis: int = 1) -> str:
+        """Metindeki emoji sayısını sınırlar - dataset'e uygun"""
+        import re
+        
+        # Unicode emoji pattern'i
+        emoji_pattern = re.compile(
+            "["
+            "\U0001F600-\U0001F64F"  # emoticons
+            "\U0001F300-\U0001F5FF"  # symbols & pictographs
+            "\U0001F680-\U0001F6FF"  # transport & map symbols
+            "\U0001F1E0-\U0001F1FF"  # flags
+            "\U00002702-\U000027B0"
+            "\U000024C2-\U0001F251"
+            "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+            "\U0001FA00-\U0001FAFF"  # Chess Symbols
+            "\U00002600-\U000026FF"  # Miscellaneous Symbols
+            "\U00002700-\U000027BF"  # Dingbats
+            "]+",
+            flags=re.UNICODE
+        )
+        
+        # Tüm emoji bloklarını bul
+        emoji_blocks = []
+        i = 0
+        while i < len(text):
+            if emoji_pattern.match(text[i]):
+                start = i
+                end = i + 1
+                while end < len(text):
+                    if text[end] == '\u200d' and end + 1 < len(text):
+                        if emoji_pattern.match(text[end + 1]):
+                            end += 2
+                        else:
+                            break
+                    elif emoji_pattern.match(text[end]):
+                        end += 1
+                    else:
+                        break
+                emoji_blocks.append((start, end))
+                i = end
+            else:
+                i += 1
+        
+        # Emoji sayısı max_emojis'den fazlaysa sadece ilk max_emojis kadarını tut
+        if len(emoji_blocks) > max_emojis:
+            parts = []
+            last_end = 0
+            
+            for idx, (start, end) in enumerate(emoji_blocks[:max_emojis]):
+                if last_end < start:
+                    parts.append(text[last_end:start])
+                last_end = end
+            
+            if last_end < len(text):
+                remaining = text[last_end:]
+                remaining = emoji_pattern.sub('', remaining)
+                remaining = remaining.replace('\u200d', '')
+                parts.append(remaining)
+            
+            kept_emojis = ''.join(text[start:end] for start, end in emoji_blocks[:max_emojis])
+            
+            result = ''.join(parts).strip()
+            if kept_emojis:
+                result = (result + ' ' + kept_emojis).strip() if result else kept_emojis
+            
+            text = result
+        
+        # Fazla boşlukları temizle
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        return text
 
     def chat(self, user_message: str) -> Dict[str, Any]:
-        """Ana sohbet fonksiyonu - duygu analizi ve yanıt üretir"""
+        """Ana sohbet fonksiyonu - LoRA modelinden cevap, sonra LLM'den duygu"""
         # Güvenlik kontrolleri
         if not user_message:
             return {"response": "Mesaj boş olamaz"}
         
-        # Mesaj uzunluk kontrolü
         if not self._validate_emotion_message_length(user_message):
             return {"response": f"Mesaj çok uzun. Maksimum {MAX_EMOTION_MESSAGE_LENGTH} karakter olabilir."}
         
-        # Input sanitization
         user_message = self._sanitize_emotion_input(user_message)
         if user_message == "[Güvenlik nedeniyle mesaj filtrelendi]":
             return {"response": "Güvenlik nedeniyle mesaj filtrelendi"}
@@ -176,66 +521,94 @@ class EmotionChatbot:
         self.stats["requests"] += 1
         self.stats["last_request_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # ConversationSummaryBufferMemory sistemi kullanılacak - bu kısım kaldırıldı
-        # Sadece sistem promptu ve kullanıcı mesajı - memory chain tarafından yönetilecek
-        # Önceki konuşma geçmişi ana sistem tarafından ConversationSummaryBufferMemory ile yönetiliyor
-        messages_payload: list[Dict[str, Any]] = [{"role": "system", "content": self._get_emotion_system_prompt().strip()}]
-        messages_payload.append({"role": "user", "content": user_message})
+        # ADIM 1: LoRA modelinden cevap al (sadece kullanıcı mesajı ile)
+        print("[EMOTION] LoRA modelinden cevap alınıyor...")
+        
+        # LoRA modeli önceden yüklenmiş olmalı, kontrol et
+        if not self._lora_loaded:
+            if self._lora_loading:
+                print("[EMOTION] LoRA modeli hala yükleniyor, bekleniyor...")
+                import time
+                for _ in range(60):
+                    if self._lora_loaded:
+                        break
+                    time.sleep(1)
+            if not self._lora_loaded:
+                print("[EMOTION] LoRA modeli yüklenmedi, şimdi yükleniyor...")
+                self._load_lora_model()
+        
+        if not TRANSFORMERS_AVAILABLE or self.lora_model is None:
+            return {"response": "LoRA model yüklenemedi. Lütfen transformers ve peft kütüphanelerini yükleyin."}
+        
+        try:
+            import torch
+        except ImportError:
+            return {"response": "LoRA model yüklenemedi. Lütfen torch kütüphanesini yükleyin."}
+        
+        # LoRA'ya sadece kullanıcının mesajını gönder
+        lora_response = self._generate_with_lora(user_message, max_new_tokens=40)
+        
+        if not lora_response:
+            return {"response": "LoRA modelinden cevap alınamadı."}
+        
+        print(f"[EMOTION] LoRA cevabı: {lora_response[:100]}...")
+        
+        # ADIM 2: LLM'den duygu analizi (kullanıcı mesajı + LoRA cevabı)
+        print("[EMOTION] LLM'den duygu analizi yapılıyor...")
+        
+        emotion_prompt = f"""Görev: Verilen kullanıcı mesajını ve asistan cevabını analiz et ve sadece 1 duygu belirle.
 
-        # Debug için OpenAI'ye giden tam metni hazırla
-        def _messages_to_debug(ms: list[Dict[str, Any]]) -> str:
-            parts: list[str] = []
-            for m in ms:
-                role = m.get("role", "")
-                if "content" in m and m["content"] is not None:
-                    parts.append(f"{role}: {m['content']}")
-                elif "function_call" in m and m["function_call"] is not None:
-                    parts.append(f"{role}: [function_call] {m['function_call']}")
-                else:
-                    parts.append(f"{role}: ")
-            return "\n".join(parts)
+Kullanıcı mesajı: "{user_message}"
+Asistan cevabı: "{lora_response}"
 
-        request_debug = _messages_to_debug(messages_payload)
+Sadece aşağıdaki JSON formatını döndür, başka hiçbir şey yazma:
 
-        if self.use_gemini:
-            # Gemini API kullan - sadece API key ile
-            import google.generativeai as genai
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            # Gemini için mesajları düz metne çevir
-            prompt_text = self._convert_messages_to_prompt(messages_payload)
-            response = model.generate_content(prompt_text)
-            # Gemini response'unu OpenAI formatına çevir
-            completion = type('obj', (object,), {
-                'choices': [type('obj', (object,), {
-                    'message': type('obj', (object,), {
-                        'content': response.text,
-                        'function_call': None
-                    })()
-                })()]
-            })()
-        else:
-            # OpenAI API kullan
-            completion = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=messages_payload,
-                functions=self.get_functions(),
-                function_call="auto",
-                temperature=0.2,
-            )
+{{"ruh_hali": "Mutlu"}}
 
-        msg = completion.choices[0].message
+Seçilebilecek ruh halleri (sadece bu listeden seç):
+- Mutlu
+- Üzgün
+- Öfkeli
+- Şaşkın
+- Utanmış
+- Endişeli
+- Gülümseyen
+- Flörtöz
+- Sorgulayıcı
+- Yorgun
 
-        # Emotion sistemi function-calling kullanmaz; istatistikler ayrı sistemdedir.
-
-        # Aksi halde modelden JSON veya fonksiyon benzeri metin bekliyoruz
-        content = msg.content or ""
-
-        # İstatistik düz metin yakalama kaldırıldı; STATS akışına devredildi.
-
+ÖNEMLİ: Sadece JSON formatında cevap ver. Metin ekleme, açıklama yapma."""
+        
+        messages_payload: list[Dict[str, Any]] = [
+            {"role": "system", "content": "Sen bir duygu analiz asistanısın. Verilen metni analiz edip sadece JSON formatında duygu döndürürsün. Başka hiçbir şey yazmazsın."},
+            {"role": "user", "content": emotion_prompt}
+        ]
+        
+        # LLM'den duygu analizi al
+        try:
+            if self.use_gemini:
+                import google.generativeai as genai
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                prompt_text = self._convert_messages_to_prompt(messages_payload)
+                response = model.generate_content(prompt_text)
+                emotion_content = response.text
+                print(f"[EMOTION] Gemini duygu cevabı: {emotion_content}")
+            else:
+                completion = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=messages_payload,
+                    temperature=0.2,
+                )
+                emotion_content = completion.choices[0].message.content or ""
+        except Exception as e:
+            print(f"[ERROR] LLM duygu analizi hatası: {e}")
+            emotion_content = json.dumps({
+                "ruh_hali": random.choice(["Mutlu", "Üzgün", "Şaşkın"])
+            })
+        
+        # JSON çıkar
         def extract_json_object(text: str) -> Dict[str, Any] | None:
-            # code fence temizle
             t = text.replace("```json", "").replace("```", "").strip()
-            # İlk dengeli JSON objesini çıkar (kaçışlı stringleri hesaba kat)
             start = t.find('{')
             if start == -1:
                 return None
@@ -269,106 +642,101 @@ class EmotionChatbot:
                 return json.loads(candidate)
             except Exception:
                 return None
-
-        data = extract_json_object(content)
-        if not data:
-            # Ham chat'i kaydet
-            self._append_chat_history(user_message, content)
-            # Geçmişe ekle
-            self.messages.append({"role": "user", "content": user_message})
-            self.messages.append({"role": "assistant", "content": content})
-            return {"response": content, "request_debug": request_debug}
-
-        required_keys = {"kullanici_ruh_hali", "ilk_ruh_hali", "ilk_cevap", "ikinci_ruh_hali", "ikinci_cevap"}
-        missing = [k for k in required_keys if k not in data]
-        if missing:
-            # Ham chat'i kaydet
-            self._append_chat_history(user_message, content)
-            return {"response": content}
-
+        
+        emotion_data = extract_json_object(emotion_content)
+        
+        # Fallback: JSON parse edilemezse rastgele duygu
+        if not emotion_data:
+            print("[WARNING] LLM'den JSON parse edilemedi, rastgele duygu seçiliyor")
+            emotion_data = {
+                "ruh_hali": random.choice(["Mutlu", "Üzgün", "Şaşkın"])
+            }
+        
         # Duygu sayaçlarını güncelle
-        def inc(mood: str) -> None:
-            key = (mood or "").strip()
-            if key in self.emotion_counts:
-                self.emotion_counts[key] += 1
-
-        user_mood_raw = str(data.get("kullanici_ruh_hali", ""))
-        first_mood_raw = str(data.get("ilk_ruh_hali", ""))
-        second_mood_raw = str(data.get("ikinci_ruh_hali", ""))
-
-        inc(user_mood_raw)
-        inc(first_mood_raw)
-        inc(second_mood_raw)
-        # Sayaçları kalıcı kaydet
-        self._save_mood_counts()
-
+        mood_raw = str(emotion_data.get("ruh_hali", ""))
+        if mood_raw.strip() in self.emotion_counts:
+            self.emotion_counts[mood_raw.strip()] += 1
+            self._save_mood_counts()
+        
         # Emoji seçim: mood_emojis.json'dan duyguya göre rastgele
         def normalize_mood(name: str) -> str:
-            n = name.strip().lower()
+            """Duygu ismini mood_emojis.json'daki anahtarlara normalize eder"""
+            n = name.strip()
+            n_lower = n.lower()
+            
+            # Direkt JSON anahtarlarını kontrol et
+            json_keys = list(MOOD_EMOJIS.keys())
+            for key in json_keys:
+                if key.lower() == n_lower:
+                    return key
+            
+            # Yazım hatalarını düzelt
             mapping = {
+                "güllümseyen": "Gülümseyen",
+                "gülümseyen": "Gülümseyen",
+                "gullumseyen": "Gülümseyen",
+                "gulumsyen": "Gülümseyen",
                 "utangaç": "Utanmış",
                 "utanmış": "Utanmış",
-                "gülümseyen": "Gülümseyen",
+                "utanmis": "Utanmış",
+                "utangac": "Utanmış",
                 "mutlu": "Mutlu",
                 "üzgün": "Üzgün",
+                "uzgun": "Üzgün",
                 "öfkeli": "Öfkeli",
+                "ofkeli": "Öfkeli",
                 "şaşkın": "Şaşkın",
+                "saskin": "Şaşkın",
                 "endişeli": "Endişeli",
+                "endiseli": "Endişeli",
                 "flörtöz": "Flörtöz",
+                "flortoz": "Flörtöz",
+                "flörtoz": "Flörtöz",
+                "flortöz": "Flörtöz",
                 "sorgulayıcı": "Sorgulayıcı",
+                "sorgulayici": "Sorgulayıcı",
                 "yorgun": "Yorgun",
             }
-            return mapping.get(n, name)
-
+            
+            normalized = mapping.get(n_lower)
+            if normalized and normalized in json_keys:
+                return normalized
+            
+            return n
+        
         def pick_emoji(mood: str) -> Optional[str]:
+            """mood_emojis.json'dan duyguya göre rastgele emoji seçer"""
             key = normalize_mood(mood)
+            
+            # JSON'daki anahtarları direkt kontrol et
             options = MOOD_EMOJIS.get(key)
             if options:
                 try:
                     return random.choice(options)
                 except Exception:
                     return None
+            
+            # Fallback: fuzzy matching
+            for json_key in MOOD_EMOJIS.keys():
+                if json_key.lower() in key.lower() or key.lower() in json_key.lower():
+                    options = MOOD_EMOJIS.get(json_key)
+                    if options:
+                        try:
+                            return random.choice(options)
+                        except Exception:
+                            continue
+            
             return None
-
-        first_emoji = pick_emoji(first_mood_raw)
-        second_emoji = pick_emoji(second_mood_raw)
-
-        response_text = json.dumps(data, ensure_ascii=False)
-        # Ham chat'i kaydet
-        self._append_chat_history(user_message, response_text)
-        # Geçmişe ekle
-        self.messages.append({"role": "user", "content": user_message})
-        self.messages.append({"role": "assistant", "content": response_text})
-
+        
+        emoji = pick_emoji(mood_raw)
+        
+        # Konuşma geçmişini kaydet
+        self._append_chat_history(user_message, lora_response)
+        
+        # Response format: Frontend'in beklediği format
         return {
-            "response": response_text,
-            "first_emoji": first_emoji,
-            "second_emoji": second_emoji,
-            "request_debug": request_debug,
+            "response": lora_response,  # LoRA cevabı
+            "emoji": emoji,  # Tek emoji
+            "mood": mood_raw,  # Duygu
+            "stats": self.stats,  # İstatistikler
         }
-
-    def _get_emotion_system_prompt(self) -> str:
-        """Duygu analizi için sistem prompt'unu döndürür"""
-        return """
-Sen bir duygu sınıflandırma ve yanıt üretme modelisin.
-Görevin şunlardır:
-
-1. Kullanıcının mesajındaki duyguyu tahmin et.
-2. O duyguya uygun bir ilk cevap yaz.
-3. Ardından ilk duygu ile uyumlu bir ikinci duygu seç; gerekirse aynı duyguyu tekrar seçebilirsin.
-4. Seçilen ikinci duyguya uygun bir ikinci cevap yaz (ilk yanıtla tutarlı olmalıdır).
-5. Çıktıyı Türkçe ver ve her iki yanıt da sadece 1 cümle olmalıdır.
-6. Ek olarak, kullanıcının verdiği mesajdan kullanıcının duygu durumunu tek bir etiket ile belirle.
-6. Çıktıyı her zaman aşağıdaki JSON formatında ver:
-
-{
-  "kullanici_ruh_hali": "...",
-  "ilk_ruh_hali": "...",
-  "ilk_cevap": "...",
-  "ikinci_ruh_hali": "...",
-  "ikinci_cevap": "..."
-}
-
-Seçilebilecek ruh halleri:
-Mutlu, Üzgün, Öfkeli, Şaşkın, Utanmış, Endişeli, Gülümseyen, Flörtöz, Sorgulayıcı, Sorgulayıcı, Yorgun
-"""
