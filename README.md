@@ -35,7 +35,7 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
   - Asenkron model yükleme
   - Akıllı kaynak belirleme
 
-### ⚡ **5. Hafta: LangChain ve Memory Yönetimi** *(Devam Ediyor)*
+### ⚡ **5. Hafta: LangChain ve Memory Yönetimi**
 - **Öğrenilen Konular**: Chain yapıları, Memory yönetimi, Tool integration, Agent'lar
 - **Projede Uygulama**: LangChain entegrasyonu ve ConversationSummaryBufferMemory
 - **Kod Yapısı**: Chain-based mimari ve hibrit memory sistemi
@@ -44,6 +44,19 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
   - **ConversationSummaryBufferMemory**: Uzun konuşmaları özetler, son mesajları hatırlar
   - **Akış Yönlendirme Chain'i**: LLM ile otomatik akış seçimi
   - **Modüler Chain'ler**: Her sistem ayrı chain olarak çalışır
+
+### 🧪 **6. Hafta: LoRA ile Kişiselleştirilmiş Duygu Sistemi**
+- **Öğrenilen Konular**: PEFT/LoRA, sentetik veri üretimi, adapter tabanlı fine-tuning, inference optimizasyonu
+- **Veri Üretimi (Gemini)**: Gemini API ile otomatik loop kurularak ~7.000+ satır Türkçe diyalog ve duygu örneği üretildi (sentetik dataset)
+- **Model Eğitimi**: `ytu-ce-cosmos/turkish-gpt2-medium` tabanlı LoRA adapter eğitildi (r=16, alpha=32, dropout=0.05)
+- **Eğitim Detayları**: 4 epoch, 2 bach size ~18 dk (bf16, RTX 4060, CUDA 12.1), train_loss ≈ 2.38; 7,247 diyalog (train 6,522 / val 725)
+- **Entegrasyon**: LoRA adapter, mevcut duygu sistemine entegre edildi ve frontend tek duygu/tek emoji akışına göre uyumlandı
+- **Çalışma Akışı**:
+  1) LoRA modelinden sadece kullanıcı mesajına göre yanıt üretilir
+  2) Üretilen yanıt ve kullanıcı mesajı LLM'e (Gemini/GPT) gönderilir; LLM sadece 1 duygu döndürür
+  3) Duyguya karşılık `data/mood_emojis.json` içinden rastgele bir yüz emojisi seçilir ve arayüzde gösterilir
+  
+
 
 ---
 
@@ -77,11 +90,11 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
 - OpenAI function calling
 - Görsel efektler ve animasyonlar
 
-### 💭 **Duygu Analizi**
-- 10 farklı duygu tespiti
-- İki aşamalı yanıt sistemi
-- Emoji desteği
-- Kalıcı veri depolama
+### 💭 **Duygu Analizi (LoRA Entegre)**
+- LoRA tabanlı kişiselleştirilmiş yanıt üretimi (Turkish GPT-2 Medium + LoRA)
+- LLM (Gemini/GPT) ile tek duygu tespiti (JSON formatında: {"ruh_hali": "..."})
+- `data/mood_emojis.json` üzerinden duyguya göre yüz emojisi seçimi
+- Kalıcı veri depolama (konuşma geçmişi ve zaman damgalı duygu kayıtları)
 
 ### 📊 **İstatistik Sistemi**
 - Duygu verilerini analiz eder
@@ -125,14 +138,16 @@ OPENAI_API_KEY=sk-your-api-key-here
 
 ### 4. PDF Dosyaları
 `PDFs/` klasörüne PDF dosyalarınızı yerleştirin:
-- `.pdf`
-- `gerekceli_anayasa.pdf` 
-- `clean_architecture.pdf`
+- `cat_care.pdf`
+- `parrot_care.pdf` 
+- `rabbit_care.pdf`
 
 ### 5. Çalıştırma
 ```bash
 # Sunucuyu başlat
 uvicorn api_web_chatbot:app --host 0.0.0.0 --port 8000 --reload
+ya da
+python api.web_chatbot.py
 ```
 
 ### 6. Kullanım
@@ -177,9 +192,11 @@ Tarayıcınızda: `http://localhost:8000/`
 - **Fallback**: Anahtar kelime tabanlı yönlendirme
 
 ### Duygu Sistemi
-- **JSON Format**: İlk/ikinci duygu + cevap
-- **Emoji Seçimi**: Rastgele seçim
-- **Kalıcı Depolama**: JSON dosyaları
+- **LoRA Eğitim**: `ytu-ce-cosmos/turkish-gpt2-medium` üstünde LoRA (r=16, alpha=32, dropout=0.05), eğitim verisi ~7k sentetik diyalog (Gemini ile üretildi)
+- **Inference**: LoRA adapter, uygulama başında asenkron yüklenir; yanıt üretirken yalnızca kullanıcı mesajı kullanılır
+- **Duygu Analizi**: LoRA yanıtı + kullanıcı mesajı LLM'e verilip tek duygu JSON olarak istenir
+- **Emoji Eşleme**: `data/mood_emojis.json` içinden duyguya göre yüz emojisi seçilir (yüz içermeyen emojiler filtrelenir)
+- **Güvenlik/Temizlik**: Prompt sızıntısı/önekler temizlenir, maksimum 1 emoji kuralı uygulanır
 
 ### İstatistik Sistemi
 - **Veri Kaynağı**: data/chat_history.txt ve mood_counter.txt
