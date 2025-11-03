@@ -145,9 +145,7 @@ OPENAI_API_KEY=sk-your-api-key-here
 ### 5. Çalıştırma
 ```bash
 # Sunucuyu başlat
-uvicorn api_web_chatbot:app --host 0.0.0.0 --port 8000 --reload
-ya da
-python api.web_chatbot.py
+python main.py
 ```
 
 ### 6. Kullanım
