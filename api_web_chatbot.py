@@ -704,6 +704,24 @@ def index() -> HTMLResponse:
         html = template_path.read_text(encoding="utf-8")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"HTML yüklenemedi: {e}")
+    try:
+        # Cache-busting: static dosya URL'lerine versiyon parametresi ekle
+        # Güvenli regex ile sadece query olmayan /static yollarına ?v=TIMESTAMP ekler
+        import time
+        version = str(int(time.time()))  # Uygulama başına değişir; dev için idealdir
+
+        def _add_version(m):
+            # Grup 1: href/src="  | Grup 2: /static/... | Grup 3: " veya '
+            prefix, path, suffix = m.group(1), m.group(2), m.group(3)
+            if '?' in path:
+                return f"{prefix}{path}{suffix}"
+            return f"{prefix}{path}?v={version}{suffix}"
+
+        # href/src özniteliklerinde /static ile başlayan yolları hedefle
+        html = re.sub(r"((?:href|src)=[\"'])((?:/static/)[^\"'<>]+)([\"'])", _add_version, html, flags=re.IGNORECASE)
+    except Exception:
+        # Cache-bust işlemi başarısız olsa bile sayfayı döndür
+        pass
     return HTMLResponse(content=html)
 
 
