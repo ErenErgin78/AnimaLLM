@@ -2,12 +2,12 @@
 LoRA EĞİTİM RAPORU
 ================================================================================
 
-Oluşturulma Tarihi: 2025-11-03 15:17:18
+Oluşturulma Tarihi: 2025-11-03 22:16:34
 
 ================================================================================
 MODEL BİLGİLERİ
 ================================================================================
-Base Model: ytu-ce-cosmos/turkish-gpt2-medium
+Base Model: ytu-ce-cosmos/turkish-gpt2-large
 Model Tipi: Turkish GPT-2 Medium (Türkçe için optimize edilmiş GPT-2)
 Fine-tuning Yöntemi: LoRA (Low-Rank Adaptation)
 LoRA Rank (r): 16
@@ -19,15 +19,15 @@ Target Modules: ['c_attn', 'c_proj'] (GPT-2)
 ================================================================================
 MODEL İSTATİSTİKLERİ
 ================================================================================
-Toplam Parametre: 359,148,544
-Eğitilebilir Parametre: 4,325,376
-Dondurulmuş Parametre: 354,823,168
-Eğitilebilir Oran: 1.20%
+Toplam Parametre: 782,140,160
+Eğitilebilir Parametre: 8,110,080
+Dondurulmuş Parametre: 774,030,080
+Eğitilebilir Oran: 1.04%
 
 ================================================================================
 DATASET BİLGİLERİ
 ================================================================================
-Veri Dosyası: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Data\final.json
+Veri Dosyası: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Data\final.txt
 Toplam Diyalog: 12,489
 Train Set: 11,240 örnek
 Validation Set: 1,249 örnek (10.0%)
@@ -37,13 +37,13 @@ Min: 46, Max: 224
 ================================================================================
 EĞİTİM BİLGİLERİ
 ================================================================================
-Başlangıç: 2025-11-03 14:39:50
-Bitiş: 2025-11-03 15:17:12
-Toplam Süre: 0:37:21.670648
+Başlangıç: 2025-11-03 20:34:48
+Bitiş: 2025-11-03 22:16:26
+Toplam Süre: 1:41:38.113160
 
 Epoch Sayısı: 5
-Batch Size: 2
-Gradient Accumulation Steps: 16
+Batch Size: 1
+Gradient Accumulation Steps: 32
 Effective Batch Size: 32
 Learning Rate: 2e-4
 LR Scheduler: cosine
@@ -58,11 +58,11 @@ GPU Memory: 8.00 GB
 EĞİTİM METRİKLERİ
 ================================================================================
 Train Metrikleri:
-  train_runtime: 2241.056800
-  train_samples_per_second: 25.077000
-  train_steps_per_second: 0.783000
-  total_flos: 3115537824153600.000000
-  train_loss: 2.006846
+  train_runtime: 6097.311900
+  train_samples_per_second: 9.217000
+  train_steps_per_second: 0.288000
+  total_flos: 6735342390159360.000000
+  train_loss: 1.860191
   epoch: 4.996441
 
 
@@ -76,54 +76,50 @@ Test Örnek Sayısı: 5
 Prompt: user: Bugün çok mutluyum! assistant:
 
 Tam Çıktı:
-user: Bugün çok mutluyum! assistant: Ooo, ne güzel! Pozitif enerji yaymışsın. İyi ki varsın kanka. Bi kahve içelim mi? Hep böyle ol. Keyfini çıkar canım benim. ‍ ‍ ‍ Yarın daha da mutlu olursun umarım. Müzik aç
+user: Bugün çok mutluyum! assistant: Vay be! Ne güzel bi gün, anlat çabuk. Keyfin yerinde mi? Bi kahve içelim. Anlat bakalım ne oldu bu sefer? İyi misin? Belki bir şey olmuştur. N'oldu? Merak ettim şimdi. Çok sevindim senin adına.
 
 Sadece Yanıt:
-Ooo, ne güzel! Pozitif enerji yaymışsın. İyi ki varsın kanka. Bi kahve içelim mi? Hep böyle ol. Keyfini çıkar canım benim. ‍ ‍ ‍ Yarın daha da mutlu olursun umarım. Müzik aç
+Vay be! Ne güzel bi gün, anlat çabuk. Keyfin yerinde mi? Bi kahve içelim. Anlat bakalım ne oldu bu sefer? İyi misin? Belki bir şey olmuştur. N'oldu? Merak ettim şimdi. Çok sevindim senin adına.
 --------------------------------------------------------------------------------
 
 --- TEST 2 ---
 Prompt: user: İş yerinde sorun yaşıyorum. assistant:
 
 Tam Çıktı:
-user: İş yerinde sorun yaşıyorum. assistant: Sorma ya, patron hep aynı şeyi yapıyor. Sıkıntıdan patlayacaksın. Çek git biraz daha. Boş ver işleri. Pes etme. Sen yoluna bakacaksın. ‍
-Ah canım bu devirde de var öyle şeyler, pes etmek yok.
+user: İş yerinde sorun yaşıyorum. assistant: Koştur o zaman, halletsin ne varsa. Başka çaren yok. ‍ Takma kafana. Her şey yoluna girer. ‍ Bırak gitsin. Bi dahakine daha dikkatli olursun. ‍ Dinlenmeye bak sen. Sensiz dünya
 
 Sadece Yanıt:
-Sorma ya, patron hep aynı şeyi yapıyor. Sıkıntıdan patlayacaksın. Çek git biraz daha. Boş ver işleri. Pes etme. Sen yoluna bakacaksın. ‍
-Ah canım bu devirde de var öyle şeyler, pes etmek yok.
+Koştur o zaman, halletsin ne varsa. Başka çaren yok. ‍ Takma kafana. Her şey yoluna girer. ‍ Bırak gitsin. Bi dahakine daha dikkatli olursun. ‍ Dinlenmeye bak sen. Sensiz dünya
 --------------------------------------------------------------------------------
 
 --- TEST 3 ---
 Prompt: user: Yeni bir hobi edindim. assistant:
 
 Tam Çıktı:
-user: Yeni bir hobi edindim. assistant: Ne yapıyorsun? Resim, müzik falan yapsana biraz. Kafa dağıtırsın biraz. Çok güzel olur. Keyfine bak. Hadi bakalım, iyi eğlenceler.
-Yeni hobin hayırlı olsun kanka. Ellerine sağlık. Belki bende yaparım bu işi.
+user: Yeni bir hobi edindim. assistant: Harika! Ne yapıyorsun bakalım? Anlatsana biraz. Belki ben de gelirim. Fotoğraf falan çekeriz. Ya da bi' oyun. Kafa dağıtırız beraber. Bi' şeyler yaparız birlikte. At bize de bi' yerlere gidelim. Güzel olur. Keyifli
 
 Sadece Yanıt:
-Ne yapıyorsun? Resim, müzik falan yapsana biraz. Kafa dağıtırsın biraz. Çok güzel olur. Keyfine bak. Hadi bakalım, iyi eğlenceler.
-Yeni hobin hayırlı olsun kanka. Ellerine sağlık. Belki bende yaparım bu işi.
+Harika! Ne yapıyorsun bakalım? Anlatsana biraz. Belki ben de gelirim. Fotoğraf falan çekeriz. Ya da bi' oyun. Kafa dağıtırız beraber. Bi' şeyler yaparız birlikte. At bize de bi' yerlere gidelim. Güzel olur. Keyifli
 --------------------------------------------------------------------------------
 
 --- TEST 4 ---
 Prompt: user: Çok yorgunum. assistant:
 
 Tam Çıktı:
-user: Çok yorgunum. assistant: Erken yat kendine gel, dinlen biraz. Yarın da dinlenemezsin. Yorgunluktan ölmezsin sen. İyi uykular aslanım. Dinlen artık. Kendine iyi bak. Sana da çok iyi gelir. 😂 Uyuduğun sürece dinç hissedersin
+user: Çok yorgunum. assistant: Gel bi yürüyüşe çıkalım, iyi gelir. İyi uykular sana. Yorgunluğu da atarsın. Keyfini çıkarırsın. ‍ Kim tutar seni. Dinlen biraz. Kafa dağıtırsın. Rahatla biraz. Enerjin yükselir. �
 
 Sadece Yanıt:
-Erken yat kendine gel, dinlen biraz. Yarın da dinlenemezsin. Yorgunluktan ölmezsin sen. İyi uykular aslanım. Dinlen artık. Kendine iyi bak. Sana da çok iyi gelir. 😂 Uyuduğun sürece dinç hissedersin
+Gel bi yürüyüşe çıkalım, iyi gelir. İyi uykular sana. Yorgunluğu da atarsın. Keyfini çıkarırsın. ‍ Kim tutar seni. Dinlen biraz. Kafa dağıtırsın. Rahatla biraz. Enerjin yükselir. �
 --------------------------------------------------------------------------------
 
 --- TEST 5 ---
 Prompt: user: Harika bir haber aldım! assistant:
 
 Tam Çıktı:
-user: Harika bir haber aldım! assistant: Anlat hemen, merak ettim şimdi. Hadi bakalım, neymiş o. Hemen anlatırım sana. Meraklandırır beni birazdan. Sevgilerimle. 😊 🤗 Başarılar dilerim canım benim. 💕 ➡️ iyi haberlerini paylaş bizimle. Ne
+user: Harika bir haber aldım! assistant: Aa, ne haberi? Anlatsana hemen. Merak ettim şimdi. Çok sevindim senin adına. Hemen anlat bana. Güzel haberlere ihtiyacımız var. Koş koş yetişirim sana. İnşallah daha güzel haberler gelir. Üzülme. İyi haberlerini bekliyorum. Çabuk gel çabuk
 
 Sadece Yanıt:
-Anlat hemen, merak ettim şimdi. Hadi bakalım, neymiş o. Hemen anlatırım sana. Meraklandırır beni birazdan. Sevgilerimle. 😊 🤗 Başarılar dilerim canım benim. 💕 ➡️ iyi haberlerini paylaş bizimle. Ne
+Aa, ne haberi? Anlatsana hemen. Merak ettim şimdi. Çok sevindim senin adına. Hemen anlat bana. Güzel haberlere ihtiyacımız var. Koş koş yetişirim sana. İnşallah daha güzel haberler gelir. Üzülme. İyi haberlerini bekliyorum. Çabuk gel çabuk
 --------------------------------------------------------------------------------
 
 ================================================================================
@@ -136,7 +132,7 @@ Rapor Dosyası: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Cha
 NOTLAR
 ================================================================================
 - Model LoRA adapter ağırlıklarını içerir
-- Base model (ytu-ce-cosmos/turkish-gpt2-medium) ayrıca indirilmelidir
+- Base model (ytu-ce-cosmos/turkish-gpt2-large) ayrıca indirilmelidir
 - Inference için base model + LoRA adapter birlikte kullanılmalıdır
 - Model dosyaları: adapter_config.json, adapter_model.bin
 - Turkish GPT-2 Medium Türkçe için özel olarak eğitilmiş modeldir, generation için idealdir
@@ -145,3 +141,99 @@ NOTLAR
 ================================================================================
 RAPOR SONU
 ================================================================================
+
+
+[TRAIN] Eğitim süreci başlıyor...
+{'loss': 4.2508, 'grad_norm': 1.439520239830017, 'learning_rate': 2.272727272727273e-05, 'epoch': 0.06}
+{'loss': 3.6278, 'grad_norm': 1.0037611722946167, 'learning_rate': 4.545454545454546e-05, 'epoch': 0.11}
+{'loss': 2.756, 'grad_norm': 0.8027421832084656, 'learning_rate': 6.818181818181818e-05, 'epoch': 0.17}
+{'loss': 2.4939, 'grad_norm': 0.7362999320030212, 'learning_rate': 9.090909090909092e-05, 'epoch': 0.23}
+{'loss': 2.3498, 'grad_norm': 0.842205822467804, 'learning_rate': 0.00011363636363636365, 'epoch': 0.28}
+{'loss': 2.3169, 'grad_norm': 0.8851295709609985, 'learning_rate': 0.00013636363636363637, 'epoch': 0.34}
+{'loss': 2.263, 'grad_norm': 0.8381267189979553, 'learning_rate': 0.0001590909090909091, 'epoch': 0.4}
+{'loss': 2.2136, 'grad_norm': 0.8011738657951355, 'learning_rate': 0.00018181818181818183, 'epoch': 0.46}
+{'loss': 2.189, 'grad_norm': 0.874337911605835, 'learning_rate': 0.00019999683318145054, 'epoch': 0.51}
+{'loss': 2.1602, 'grad_norm': 0.88571697473526, 'learning_rate': 0.00019988601559115007, 'epoch': 0.57}
+{'loss': 2.1947, 'grad_norm': 0.8249468803405762, 'learning_rate': 0.00019961705759107546, 'epoch': 0.63}
+{'loss': 2.1244, 'grad_norm': 0.8528858423233032, 'learning_rate': 0.00019919038499787478, 'epoch': 0.68}
+{'loss': 2.1033, 'grad_norm': 0.8085730075836182, 'learning_rate': 0.0001986066733233134, 'epoch': 0.74}
+{'loss': 2.0761, 'grad_norm': 0.7586314082145691, 'learning_rate': 0.00019786684670479793, 'epoch': 0.8}
+{'loss': 2.0604, 'grad_norm': 0.8234383463859558, 'learning_rate': 0.00019697207644227385, 'epoch': 0.85}
+{'loss': 2.0395, 'grad_norm': 0.7782618999481201, 'learning_rate': 0.00019592377914381314, 'epoch': 0.91}
+{'loss': 2.0493, 'grad_norm': 0.8008346557617188, 'learning_rate': 0.00019472361448282823, 'epoch': 0.97}
+{'eval_loss': 1.9970049858093262, 'eval_runtime': 19.0433, 'eval_samples_per_second': 65.587, 'eval_steps_per_second': 8.244, 'epoch': 1.0}
+{'loss': 1.9954, 'grad_norm': 0.7985087633132935, 'learning_rate': 0.00019337348257046234, 'epoch': 1.02}
+{'loss': 1.967, 'grad_norm': 0.88113933801651, 'learning_rate': 0.00019187552094731725, 'epoch': 1.08}
+{'loss': 1.962, 'grad_norm': 0.8927944302558899, 'learning_rate': 0.00019023210119928022, 'epoch': 1.14}
+{'loss': 1.9354, 'grad_norm': 0.8524209856987, 'learning_rate': 0.00018844582520280857, 'epoch': 1.2}
+{'loss': 1.9192, 'grad_norm': 0.8355990052223206, 'learning_rate': 0.00018651952100561626, 'epoch': 1.25}
+{'loss': 1.9476, 'grad_norm': 0.8333555459976196, 'learning_rate': 0.00018445623834928424, 'epoch': 1.31}
+{'loss': 1.9088, 'grad_norm': 0.864768922328949, 'learning_rate': 0.0001822592438408827, 'epoch': 1.37}
+{'loss': 1.9345, 'grad_norm': 0.9119859337806702, 'learning_rate': 0.0001799320157812506, 'epoch': 1.42}
+{'loss': 1.8996, 'grad_norm': 0.8157371878623962, 'learning_rate': 0.0001774782386581194, 'epoch': 1.48}
+{'loss': 1.8833, 'grad_norm': 0.8869819641113281, 'learning_rate': 0.0001749017973128, 'epoch': 1.54}
+{'loss': 1.8795, 'grad_norm': 0.876751184463501, 'learning_rate': 0.000172206770789668, 'epoch': 1.59}
+{'loss': 1.8446, 'grad_norm': 0.895075798034668, 'learning_rate': 0.00016939742587818545, 'epoch': 1.65}
+{'loss': 1.8992, 'grad_norm': 0.964469850063324, 'learning_rate': 0.00016647821035768224, 'epoch': 1.71}
+{'loss': 1.8822, 'grad_norm': 0.9110947251319885, 'learning_rate': 0.00016345374595559342, 'epoch': 1.77}
+{'loss': 1.8775, 'grad_norm': 0.8740764260292053, 'learning_rate': 0.00016032882103029993, 'epoch': 1.82}
+{'loss': 1.8647, 'grad_norm': 0.9471189975738525, 'learning_rate': 0.00015710838299015783, 'epoch': 1.88}
+{'loss': 1.8621, 'grad_norm': 0.8871923685073853, 'learning_rate': 0.00015379753046071865, 'epoch': 1.94}
+{'loss': 1.8542, 'grad_norm': 0.8954710960388184, 'learning_rate': 0.0001504015052125406, 'epoch': 1.99}
+{'eval_loss': 1.8558073043823242, 'eval_runtime': 7.8301, 'eval_samples_per_second': 159.512, 'eval_steps_per_second': 20.051, 'epoch': 2.0}
+{'loss': 1.7793, 'grad_norm': 0.9166408181190491, 'learning_rate': 0.00014692568386237196, 'epoch': 2.05}
+{'loss': 1.7397, 'grad_norm': 0.9257825613021851, 'learning_rate': 0.00014337556936084466, 'epoch': 2.11}
+{'loss': 1.7889, 'grad_norm': 0.9578742980957031, 'learning_rate': 0.00013975678228015487, 'epoch': 2.16}
+{'loss': 1.7596, 'grad_norm': 0.9426041841506958, 'learning_rate': 0.0001360750519155242, 'epoch': 2.22}
+{'loss': 1.7479, 'grad_norm': 1.0275335311889648, 'learning_rate': 0.00013233620721452935, 'epoch': 2.28}
+{'loss': 1.7485, 'grad_norm': 0.9264952540397644, 'learning_rate': 0.00012854616754866198, 'epoch': 2.33}
+{'loss': 1.7596, 'grad_norm': 0.9786247611045837, 'learning_rate': 0.00012471093334172792, 'epoch': 2.39}
+{'loss': 1.7866, 'grad_norm': 0.9684981107711792, 'learning_rate': 0.00012083657656992393, 'epoch': 2.45}
+{'loss': 1.7316, 'grad_norm': 0.990636944770813, 'learning_rate': 0.00011692923114863226, 'epoch': 2.51}
+{'loss': 1.7215, 'grad_norm': 1.0138503313064575, 'learning_rate': 0.00011299508322115233, 'epoch': 2.56}
+{'loss': 1.7343, 'grad_norm': 0.9435333013534546, 'learning_rate': 0.00010904036136474469, 'epoch': 2.62}
+{'loss': 1.7464, 'grad_norm': 0.9998027086257935, 'learning_rate': 0.00010507132672949345, 'epoch': 2.68}
+{'loss': 1.7341, 'grad_norm': 0.9952913522720337, 'learning_rate': 0.00010109426312559873, 'epoch': 2.73}
+{'loss': 1.7113, 'grad_norm': 0.9565010070800781, 'learning_rate': 9.711546707479383e-05, 'epoch': 2.79}
+{'loss': 1.723, 'grad_norm': 1.0008471012115479, 'learning_rate': 9.314123784163702e-05, 'epoch': 2.85}
+{'loss': 1.7407, 'grad_norm': 1.0307778120040894, 'learning_rate': 8.917786746046113e-05, 'epoch': 2.9}
+{'loss': 1.7369, 'grad_norm': 0.9634193181991577, 'learning_rate': 8.523163077376991e-05, 'epoch': 2.96}
+{'eval_loss': 1.7874491214752197, 'eval_runtime': 8.2039, 'eval_samples_per_second': 152.245, 'eval_steps_per_second': 19.137, 'epoch': 3.0}
+{'loss': 1.7193, 'grad_norm': 1.0218673944473267, 'learning_rate': 8.130877549785287e-05, 'epoch': 3.02}
+{'loss': 1.6547, 'grad_norm': 1.01388418674469, 'learning_rate': 7.741551233134628e-05, 'epoch': 3.07}
+{'loss': 1.6199, 'grad_norm': 1.0059595108032227, 'learning_rate': 7.355800512240115e-05, 'epoch': 3.13}
+{'loss': 1.6752, 'grad_norm': 0.9631624221801758, 'learning_rate': 6.974236111002503e-05, 'epoch': 3.19}
+{'loss': 1.6482, 'grad_norm': 1.0360016822814941, 'learning_rate': 6.597462125504814e-05, 'epoch': 3.25}
+{'loss': 1.6586, 'grad_norm': 1.0139150619506836, 'learning_rate': 6.226075067602142e-05, 'epoch': 3.3}
+{'loss': 1.644, 'grad_norm': 1.0031343698501587, 'learning_rate': 5.860662920518909e-05, 'epoch': 3.36}
+{'loss': 1.6333, 'grad_norm': 1.0326180458068848, 'learning_rate': 5.501804207948686e-05, 'epoch': 3.42}
+{'loss': 1.6631, 'grad_norm': 1.0423974990844727, 'learning_rate': 5.1500670781304584e-05, 'epoch': 3.47}
+{'loss': 1.6577, 'grad_norm': 1.0270968675613403, 'learning_rate': 4.806008404351364e-05, 'epoch': 3.53}
+{'loss': 1.6399, 'grad_norm': 1.0074509382247925, 'learning_rate': 4.470172903300088e-05, 'epoch': 3.59}
+{'loss': 1.6507, 'grad_norm': 1.0773403644561768, 'learning_rate': 4.14309227266662e-05, 'epoch': 3.64}
+{'loss': 1.6363, 'grad_norm': 1.0508893728256226, 'learning_rate': 3.825284349353876e-05, 'epoch': 3.7}
+{'loss': 1.6461, 'grad_norm': 1.0840829610824585, 'learning_rate': 3.517252289633775e-05, 'epoch': 3.76}
+{'loss': 1.6273, 'grad_norm': 1.0610162019729614, 'learning_rate': 3.219483772545861e-05, 'epoch': 3.81}
+{'loss': 1.6295, 'grad_norm': 1.118701696395874, 'learning_rate': 2.93245022779961e-05, 'epoch': 3.87}
+{'loss': 1.6479, 'grad_norm': 1.0618096590042114, 'learning_rate': 2.6566060894027833e-05, 'epoch': 3.93}
+{'loss': 1.6168, 'grad_norm': 1.1473973989486694, 'learning_rate': 2.3923880761975757e-05, 'epoch': 3.99}
+{'eval_loss': 1.7586753368377686, 'eval_runtime': 7.8171, 'eval_samples_per_second': 159.778, 'eval_steps_per_second': 20.084, 'epoch': 4.0}
+{'loss': 1.5957, 'grad_norm': 1.0553017854690552, 'learning_rate': 2.1402145004435203e-05, 'epoch': 4.04}
+{'loss': 1.5939, 'grad_norm': 1.0396367311477661, 'learning_rate': 1.9004846055418856e-05, 'epoch': 4.1}
+{'loss': 1.5794, 'grad_norm': 1.06666100025177, 'learning_rate': 1.673577933950051e-05, 'epoch': 4.16}
+{'loss': 1.6056, 'grad_norm': 1.0706288814544678, 'learning_rate': 1.4598537262865674e-05, 'epoch': 4.21}
+{'loss': 1.6187, 'grad_norm': 1.0599555969238281, 'learning_rate': 1.2596503525782999e-05, 'epoch': 4.27}
+{'loss': 1.5909, 'grad_norm': 1.080625057220459, 'learning_rate': 1.0732847765500353e-05, 'epoch': 4.33}
+{'loss': 1.5777, 'grad_norm': 1.081052541732788, 'learning_rate': 9.010520538047718e-06, 'epoch': 4.38}
+{'loss': 1.577, 'grad_norm': 1.0577644109725952, 'learning_rate': 7.432248646891027e-06, 'epoch': 4.44}
+{'loss': 1.5986, 'grad_norm': 1.0646952390670776, 'learning_rate': 6.00053082583324e-06, 'epoch': 4.5}
+{'loss': 1.5878, 'grad_norm': 1.0916187763214111, 'learning_rate': 4.7176337829972884e-06, 'epoch': 4.56}
+{'loss': 1.6209, 'grad_norm': 1.0971250534057617, 'learning_rate': 3.585588612153867e-06, 'epoch': 4.61}
+{'loss': 1.6056, 'grad_norm': 1.0727128982543945, 'learning_rate': 2.6061875770762913e-06, 'epoch': 4.67}
+{'loss': 1.5823, 'grad_norm': 1.0558269023895264, 'learning_rate': 1.7809812740127053e-06, 'epoch': 4.73}
+{'loss': 1.6065, 'grad_norm': 1.095503807067871, 'learning_rate': 1.1112761767687053e-06, 'epoch': 4.78}
+{'loss': 1.5788, 'grad_norm': 1.092170238494873, 'learning_rate': 5.981325682865913e-07, 'epoch': 4.84}
+{'loss': 1.6034, 'grad_norm': 1.0542175769805908, 'learning_rate': 2.423628619961926e-07, 'epoch': 4.9}
+{'loss': 1.5772, 'grad_norm': 1.0877059698104858, 'learning_rate': 4.453031559485954e-08, 'epoch': 4.95}
+{'eval_loss': 1.7556586265563965, 'eval_runtime': 8.1304, 'eval_samples_per_second': 153.622, 'eval_steps_per_second': 19.31, 'epoch': 5.0}
+{'train_runtime': 6097.3119, 'train_samples_per_second': 9.217, 'train_steps_per_second': 0.288, 'train_loss': 1.8601905779281573, 'epoch': 5.0}

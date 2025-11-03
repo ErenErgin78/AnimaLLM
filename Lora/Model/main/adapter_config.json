@@ -1,7 +1,7 @@
 {
   "alpha_pattern": {},
   "auto_mapping": null,
-  "base_model_name_or_path": "ytu-ce-cosmos/turkish-gpt2-medium",
+  "base_model_name_or_path": "ytu-ce-cosmos/turkish-gpt2-large",
   "bias": "none",
   "corda_config": null,
   "eva_config": null,
@@ -25,8 +25,8 @@
   "rank_pattern": {},
   "revision": null,
   "target_modules": [
-    "c_attn",
-    "c_proj"
+    "c_proj",
+    "c_attn"
   ],
   "target_parameters": null,
   "task_type": "CAUSAL_LM",

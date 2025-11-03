@@ -1,9 +1,9 @@
 ---
-base_model: ytu-ce-cosmos/turkish-gpt2-medium
+base_model: ytu-ce-cosmos/turkish-gpt2-large
 library_name: peft
 pipeline_tag: text-generation
 tags:
-- base_model:adapter:ytu-ce-cosmos/turkish-gpt2-medium
+- base_model:adapter:ytu-ce-cosmos/turkish-gpt2-large
 - lora
 - transformers
 ---

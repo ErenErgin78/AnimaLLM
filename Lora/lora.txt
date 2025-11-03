@@ -1,0 +1,8 @@
+Önce gemini, deepseek ve chatgpt'ye sitelerden veri istedim ve bu şekilde 1000 tane veri topladım
+Sonuç çok kötü geldi (Lora/Data/Eski_Raporlar'dan görebilirsiniz)
+Dialogpt'yi turkish-gpt2-medium ile değiştirip denedim  --> sonuç aynı
+Gemini api key ile loop döngüsü kullanarak seri şekilde veri üretmeye başladım
+2000, 4000, 7200 ve 12500 satır veri ile denedim ve istediğime yakın sonuçlar verdi
+Şimdi ise ytu-ce-cosmos/turkish-gpt2-large ile deneyeceğim --> Eğitim süresi 30 dakikadan 2 saate çıkacak
+1 saat 41 dakikada model oldu --> 
+Epoch 4'ten 5'e sadece -0.003'lük bir düşüş, modelin artık "doygunluğa ulaştığını" (plateau) ve o veriden öğrenebileceği her şeyi öğrendiğini kanıtlıyor.

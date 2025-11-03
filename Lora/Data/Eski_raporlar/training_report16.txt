@@ -1,0 +1,147 @@
+================================================================================
+LoRA EĞİTİM RAPORU
+================================================================================
+
+Oluşturulma Tarihi: 2025-11-03 15:17:18
+
+================================================================================
+MODEL BİLGİLERİ
+================================================================================
+Base Model: ytu-ce-cosmos/turkish-gpt2-medium
+Model Tipi: Turkish GPT-2 Medium (Türkçe için optimize edilmiş GPT-2)
+Fine-tuning Yöntemi: LoRA (Low-Rank Adaptation)
+LoRA Rank (r): 16
+LoRA Alpha: 32
+LoRA Dropout: 0.05
+LoRA Bias: none
+Target Modules: ['c_attn', 'c_proj'] (GPT-2)
+
+================================================================================
+MODEL İSTATİSTİKLERİ
+================================================================================
+Toplam Parametre: 359,148,544
+Eğitilebilir Parametre: 4,325,376
+Dondurulmuş Parametre: 354,823,168
+Eğitilebilir Oran: 1.20%
+
+================================================================================
+DATASET BİLGİLERİ
+================================================================================
+Veri Dosyası: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Data\final.json
+Toplam Diyalog: 12,489
+Train Set: 11,240 örnek
+Validation Set: 1,249 örnek (10.0%)
+Ortalama Uzunluk: 99.09 karakter
+Min: 46, Max: 224
+
+================================================================================
+EĞİTİM BİLGİLERİ
+================================================================================
+Başlangıç: 2025-11-03 14:39:50
+Bitiş: 2025-11-03 15:17:12
+Toplam Süre: 0:37:21.670648
+
+Epoch Sayısı: 5
+Batch Size: 2
+Gradient Accumulation Steps: 16
+Effective Batch Size: 32
+Learning Rate: 2e-4
+LR Scheduler: cosine
+Warmup Ratio: 0.1
+GPU Kullanımı: Evet
+Mixed Precision: bf16 (RTX 4060 için optimize edilmiş)
+GPU: NVIDIA GeForce RTX 4060 Laptop GPU
+CUDA Version: 12.1
+GPU Memory: 8.00 GB
+
+================================================================================
+EĞİTİM METRİKLERİ
+================================================================================
+Train Metrikleri:
+  train_runtime: 2241.056800
+  train_samples_per_second: 25.077000
+  train_steps_per_second: 0.783000
+  total_flos: 3115537824153600.000000
+  train_loss: 2.006846
+  epoch: 4.996441
+
+
+================================================================================
+TEST SONUÇLARI
+================================================================================
+Test Örnek Sayısı: 5
+
+
+--- TEST 1 ---
+Prompt: user: Bugün çok mutluyum! assistant:
+
+Tam Çıktı:
+user: Bugün çok mutluyum! assistant: Ooo, ne güzel! Pozitif enerji yaymışsın. İyi ki varsın kanka. Bi kahve içelim mi? Hep böyle ol. Keyfini çıkar canım benim. ‍ ‍ ‍ Yarın daha da mutlu olursun umarım. Müzik aç
+
+Sadece Yanıt:
+Ooo, ne güzel! Pozitif enerji yaymışsın. İyi ki varsın kanka. Bi kahve içelim mi? Hep böyle ol. Keyfini çıkar canım benim. ‍ ‍ ‍ Yarın daha da mutlu olursun umarım. Müzik aç
+--------------------------------------------------------------------------------
+
+--- TEST 2 ---
+Prompt: user: İş yerinde sorun yaşıyorum. assistant:
+
+Tam Çıktı:
+user: İş yerinde sorun yaşıyorum. assistant: Sorma ya, patron hep aynı şeyi yapıyor. Sıkıntıdan patlayacaksın. Çek git biraz daha. Boş ver işleri. Pes etme. Sen yoluna bakacaksın. ‍
+Ah canım bu devirde de var öyle şeyler, pes etmek yok.
+
+Sadece Yanıt:
+Sorma ya, patron hep aynı şeyi yapıyor. Sıkıntıdan patlayacaksın. Çek git biraz daha. Boş ver işleri. Pes etme. Sen yoluna bakacaksın. ‍
+Ah canım bu devirde de var öyle şeyler, pes etmek yok.
+--------------------------------------------------------------------------------
+
+--- TEST 3 ---
+Prompt: user: Yeni bir hobi edindim. assistant:
+
+Tam Çıktı:
+user: Yeni bir hobi edindim. assistant: Ne yapıyorsun? Resim, müzik falan yapsana biraz. Kafa dağıtırsın biraz. Çok güzel olur. Keyfine bak. Hadi bakalım, iyi eğlenceler.
+Yeni hobin hayırlı olsun kanka. Ellerine sağlık. Belki bende yaparım bu işi.
+
+Sadece Yanıt:
+Ne yapıyorsun? Resim, müzik falan yapsana biraz. Kafa dağıtırsın biraz. Çok güzel olur. Keyfine bak. Hadi bakalım, iyi eğlenceler.
+Yeni hobin hayırlı olsun kanka. Ellerine sağlık. Belki bende yaparım bu işi.
+--------------------------------------------------------------------------------
+
+--- TEST 4 ---
+Prompt: user: Çok yorgunum. assistant:
+
+Tam Çıktı:
+user: Çok yorgunum. assistant: Erken yat kendine gel, dinlen biraz. Yarın da dinlenemezsin. Yorgunluktan ölmezsin sen. İyi uykular aslanım. Dinlen artık. Kendine iyi bak. Sana da çok iyi gelir. 😂 Uyuduğun sürece dinç hissedersin
+
+Sadece Yanıt:
+Erken yat kendine gel, dinlen biraz. Yarın da dinlenemezsin. Yorgunluktan ölmezsin sen. İyi uykular aslanım. Dinlen artık. Kendine iyi bak. Sana da çok iyi gelir. 😂 Uyuduğun sürece dinç hissedersin
+--------------------------------------------------------------------------------
+
+--- TEST 5 ---
+Prompt: user: Harika bir haber aldım! assistant:
+
+Tam Çıktı:
+user: Harika bir haber aldım! assistant: Anlat hemen, merak ettim şimdi. Hadi bakalım, neymiş o. Hemen anlatırım sana. Meraklandırır beni birazdan. Sevgilerimle. 😊 🤗 Başarılar dilerim canım benim. 💕 ➡️ iyi haberlerini paylaş bizimle. Ne
+
+Sadece Yanıt:
+Anlat hemen, merak ettim şimdi. Hadi bakalım, neymiş o. Hemen anlatırım sana. Meraklandırır beni birazdan. Sevgilerimle. 😊 🤗 Başarılar dilerim canım benim. 💕 ➡️ iyi haberlerini paylaş bizimle. Ne
+--------------------------------------------------------------------------------
+
+================================================================================
+KAYIT BİLGİLERİ
+================================================================================
+Model Klasörü: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Model\lora-turkish-gpt2-medium
+Rapor Dosyası: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Data\training_report.txt
+
+================================================================================
+NOTLAR
+================================================================================
+- Model LoRA adapter ağırlıklarını içerir
+- Base model (ytu-ce-cosmos/turkish-gpt2-medium) ayrıca indirilmelidir
+- Inference için base model + LoRA adapter birlikte kullanılmalıdır
+- Model dosyaları: adapter_config.json, adapter_model.bin
+- Turkish GPT-2 Medium Türkçe için özel olarak eğitilmiş modeldir, generation için idealdir
+- RTX 4060 için bf16 mixed precision kullanılmıştır
+
+================================================================================
+RAPOR SONU
+================================================================================
