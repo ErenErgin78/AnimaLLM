@@ -101,8 +101,8 @@ def main():
     project_root = script_dir.parent.parent
     data_dir = project_root / "Lora" / "Data"
     
-    input_file = data_dir / "final2.txt"
-    output_file = data_dir / "final2.json"
+    input_file = data_dir / "final.txt"
+    output_file = data_dir / "final.json"
     
     print("=" * 80)
     print("TXT -> JSON DÖNÜŞTÜRÜCÜ")

@@ -12,6 +12,32 @@ from peft import LoraConfig, get_peft_model, TaskType
 from datasets import Dataset
 import numpy as np
 
+# Tekrarlanabilirlik için global seed değeri
+DEFAULT_SEED = 42
+
+def set_global_seed(seed: int = DEFAULT_SEED):
+    """Tekrarlanabilirlik için tüm rastgelelik kaynaklarını kilitle.
+    - Python random, NumPy ve PyTorch (CPU/GPU) seed ataması yapılır
+    - CUDA/CuDNN deterministik mod etkinleştirilir (varsa)
+    Not: Deterministik mod bazı operasyonları yavaşlatabilir ama tutarlılık sağlar
+    """
+    try:
+        # Python random
+        random.seed(seed)
+        # NumPy
+        np.random.seed(seed)
+        # PyTorch CPU
+        torch.manual_seed(seed)
+        # PyTorch CUDA (mevcutsa tüm GPU'lar)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+            # Deterministik ve benchmark ayarları
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+    except Exception as e:
+        # Seed ataması başarısız olursa süreci durdurma, ancak uyarı ver
+        print(f"[SEED] Uyarı: Seed ayarlanırken hata oluştu: {e}")
+
 # Dinamik dosya yolları - Script'in bulunduğu klasöre göre otomatik ayarlanır
 SCRIPT_DIR = Path(__file__).parent.resolve()
 PROJECT_ROOT = SCRIPT_DIR.parent.parent.resolve()
@@ -222,7 +248,8 @@ def train_model(model, tokenizer, train_dataset, output_dir: Path, num_epochs: i
         remove_unused_columns=False,
         fp16=False,  # bf16 kullanılıyor, fp16 kapatıldı
         bf16=torch.cuda.is_available(),  # RTX 4060 için bf16 True (fp16'dan daha iyi)
-        dataloader_pin_memory=torch.cuda.is_available()
+        dataloader_pin_memory=torch.cuda.is_available(),
+        seed=DEFAULT_SEED  # Trainer içi rastgeleliği kilitle
     )
     
     # Data collator - CausalLM için mlm=False
@@ -515,14 +542,12 @@ def main():
     if test_mode:
         print("TEST MODU AKTİF (500 satır)")
     print("=" * 80)
-    print(f"Script Dizini: {SCRIPT_DIR}")
-    print(f"Proje Kökü: {PROJECT_ROOT}")
-    print(f"Veri Dizini: {DATA_DIR}")
-    print(f"Model Dizini: {MODEL_DIR}")
-    print("=" * 80)
     print()
     
     try:
+        # Tekrarlanabilirlik için global seed'i erken safhada kilitle
+        # Trainer, PyTorch ve veri karıştırma süreçleri aynı seed ile çalışacak
+        set_global_seed(DEFAULT_SEED)
         print("[STEP 1] Veri dosyası okunuyor...")
         # Test modu aktifse sadece 500 satır al
         limit = 500 if test_mode else None
@@ -565,8 +590,7 @@ def main():
             batch_size, grad_accum = 2, 8  # CPU'da batch size 2 (effective: 16)
             print(f"[STEP 4] CPU modunda - Batch: {batch_size}, Effective: {batch_size * grad_accum}")
         
-        # Dataset boyutuna göre epoch sayısını belirle (Turkish GPT-2 Medium için 3 epoch varsayılan)
-        num_epochs = 4  # Sabit 4 epoch kullanılıyor
+        num_epochs = 5  # Sabit 5 epoch kullanılıyor
         print(f"[STEP 4] Dataset ({dataset_size}) - {num_epochs} epoch")
         
         # Eğitimi başlat

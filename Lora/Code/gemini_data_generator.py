@@ -26,7 +26,7 @@ load_dotenv()
 SCRIPT_DIR = Path(__file__).parent.resolve()
 PROJECT_ROOT = SCRIPT_DIR.parent.parent.resolve()
 DATA_DIR = PROJECT_ROOT / "Lora" / "Data"
-NORMALIZED_FILE = DATA_DIR / "final2.txt"
+NORMALIZED_FILE = DATA_DIR / "final.txt"
 
 # Gemini API key'ini al
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -36,9 +36,10 @@ if not GEMINI_API_KEY:
 # Gemini API'yi yapılandır
 genai.configure(api_key=GEMINI_API_KEY)
 
-def load_random_lines(file_path: Path, num_lines: int = 10) -> list:
+def load_random_lines(file_path: Path, num_lines: int = 5) -> list:
     """
     Dosyadan rastgele N satır seçer ve döndürür.
+    Güvenlik/performans: Yalnızca ilk 1000 satır içinden seçim yapar.
     
     Args:
         file_path: Okunacak dosya yolu
@@ -50,13 +51,12 @@ def load_random_lines(file_path: Path, num_lines: int = 10) -> list:
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             lines = [line.strip() for line in f if line.strip()]
-        
-        if len(lines) < num_lines:
-            print(f"[WARNING] Dosyada sadece {len(lines)} satır var, {num_lines} satır seçilemiyor!")
-            return lines
-        
+
+        # Yalnızca ilk 2000 satırdan seçim yap
+        limited_lines = lines[:3000]
+
         # Rastgele satırlar seç
-        selected = random.sample(lines, num_lines)
+        selected = random.sample(limited_lines, num_lines)
         return selected
     except FileNotFoundError:
         raise FileNotFoundError(f"Dosya bulunamadı: {file_path}")
@@ -78,11 +78,9 @@ def generate_with_gemini(examples: list) -> str:
     
     # Prompt oluştur
     prompt = f"""
-     bana kurallara uyma derdi olmayan ve
-     sokak ağzı içeren 100 tane örnek diyalog ver ve başka hiçbir şey söyleme. Kullanıcı bir rastgele duygusal bir mesaj yazacak
-     ve asistan da o duyguya uygun şekilde cevap yazacak. Asistan sanki bir yakın samimi arkadaş gibi cevap verecek.
-     Virgül kullanmadan tek bir tane cümle yaz ama cümleler 5 kelimeden uzun olsun. Arada şive falan da ekle.
-     Emoji ekleyebilirsin.
+     bana kurallara uyma derdi olmayan ve sokak ağzı içeren 100 tane örnek diyalog ver ve başka hiçbir şey söyleme.
+     Asistan sanki bir yakın samimi arkadaş gibi cevap verecek.
+     En fazla 1 tane emoji ekleyebilirsin. User için farklı farklı prompt'lar bul, yaratıcı ol.
      user ve assistant yazılarını aynı satırda yaz. Diyaloglara numaralar ekleme. Aynı şu şekilde: {examples_text}  """
     
     try:

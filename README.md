@@ -45,11 +45,10 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
   - **Akış Yönlendirme Chain'i**: LLM ile otomatik akış seçimi
   - **Modüler Chain'ler**: Her sistem ayrı chain olarak çalışır
 
-### 🧪 **6. Hafta: LoRA ile Kişiselleştirilmiş Duygu Sistemi**
 - **Öğrenilen Konular**: PEFT/LoRA, sentetik veri üretimi, adapter tabanlı fine-tuning, inference optimizasyonu
-- **Veri Üretimi (Gemini)**: Gemini API ile otomatik loop kurularak ~7.000+ satır Türkçe diyalog ve duygu örneği üretildi (sentetik dataset)
+- **Veri Üretimi (Gemini)**: Gemini API ile otomatik loop kurularak ≈12.5k Türkçe diyalog ve duygu örneği üretildi (sentetik dataset)
 - **Model Eğitimi**: `ytu-ce-cosmos/turkish-gpt2-medium` tabanlı LoRA adapter eğitildi (r=16, alpha=32, dropout=0.05)
-- **Eğitim Detayları**: 4 epoch, 2 bach size ~18 dk (bf16, RTX 4060, CUDA 12.1), train_loss ≈ 2.38; 7,247 diyalog (train 6,522 / val 725)
+- **Eğitim Detayları**: 5 epoch, batch size 2, gradient accumulation 16 (effective batch 32), bf16; RTX 4060 (CUDA 12.1). train_loss ≈ 2.01; ≈12.5k diyalog (train 11,240 / val 1,249)
 - **Entegrasyon**: LoRA adapter, mevcut duygu sistemine entegre edildi ve frontend tek duygu/tek emoji akışına göre uyumlandı
 - **Çalışma Akışı**:
   1) LoRA modelinden sadece kullanıcı mesajına göre yanıt üretilir
@@ -192,7 +191,9 @@ Tarayıcınızda: `http://localhost:8000/`
 - **Fallback**: Anahtar kelime tabanlı yönlendirme
 
 ### Duygu Sistemi
-- **LoRA Eğitim**: `ytu-ce-cosmos/turkish-gpt2-medium` üstünde LoRA (r=16, alpha=32, dropout=0.05), eğitim verisi ~7k sentetik diyalog (Gemini ile üretildi)
+- **LoRA Eğitim**: `ytu-ce-cosmos/turkish-gpt2-medium` üstünde LoRA (r=16, alpha=32, dropout=0.05). Dataset ≈12.5k sentetik diyalog (rapor: 12,489; train 11,240 / val 1,249; ort. uzunluk 99.09 karakter)
+- **Eğitim Parametreleri**: 5 epoch, batch size 2, gradient accumulation 16 (effective 32), learning rate 2e-4, scheduler cosine, warmup 0.1, bf16; RTX 4060 (CUDA 12.1); train_loss ≈ 2.01
+- **Model Çıktısı**: LoRA adapter `Lora/Model/lora-turkish-gpt2-medium` klasöründe (adapter_config.json, adapter_model.bin)
 - **Inference**: LoRA adapter, uygulama başında asenkron yüklenir; yanıt üretirken yalnızca kullanıcı mesajı kullanılır
 - **Duygu Analizi**: LoRA yanıtı + kullanıcı mesajı LLM'e verilip tek duygu JSON olarak istenir
 - **Emoji Eşleme**: `data/mood_emojis.json` içinden duyguya göre yüz emojisi seçilir (yüz içermeyen emojiler filtrelenir)

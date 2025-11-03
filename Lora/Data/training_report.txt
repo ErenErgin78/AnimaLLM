@@ -2,7 +2,7 @@
 LoRA EĞİTİM RAPORU
 ================================================================================
 
-Oluşturulma Tarihi: 2025-11-02 20:03:48
+Oluşturulma Tarihi: 2025-11-03 15:17:18
 
 ================================================================================
 MODEL BİLGİLERİ
@@ -28,20 +28,20 @@ Eğitilebilir Oran: 1.20%
 DATASET BİLGİLERİ
 ================================================================================
 Veri Dosyası: C:\Users\Eren\Desktop\Stuff\Kairu\LLM\Openai-Emotion-Animals-Chatbot\Lora\Data\final.json
-Toplam Diyalog: 7,247
-Train Set: 6,522 örnek
-Validation Set: 725 örnek (10.0%)
-Ortalama Uzunluk: 119.26 karakter
-Min: 51, Max: 256
+Toplam Diyalog: 12,489
+Train Set: 11,240 örnek
+Validation Set: 1,249 örnek (10.0%)
+Ortalama Uzunluk: 99.09 karakter
+Min: 46, Max: 224
 
 ================================================================================
 EĞİTİM BİLGİLERİ
 ================================================================================
-Başlangıç: 2025-11-02 19:45:29
-Bitiş: 2025-11-02 20:03:41
-Toplam Süre: 0:18:12.119476
+Başlangıç: 2025-11-03 14:39:50
+Bitiş: 2025-11-03 15:17:12
+Toplam Süre: 0:37:21.670648
 
-Epoch Sayısı: 4
+Epoch Sayısı: 5
 Batch Size: 2
 Gradient Accumulation Steps: 16
 Effective Batch Size: 32
@@ -58,12 +58,12 @@ GPU Memory: 8.00 GB
 EĞİTİM METRİKLERİ
 ================================================================================
 Train Metrikleri:
-  train_runtime: 1090.928700
-  train_samples_per_second: 23.914000
-  train_steps_per_second: 0.744000
-  total_flos: 1672157930496000.000000
-  train_loss: 2.376553
-  epoch: 3.984054
+  train_runtime: 2241.056800
+  train_samples_per_second: 25.077000
+  train_steps_per_second: 0.783000
+  total_flos: 3115537824153600.000000
+  train_loss: 2.006846
+  epoch: 4.996441
 
 
 ================================================================================
@@ -76,50 +76,54 @@ Test Örnek Sayısı: 5
 Prompt: user: Bugün çok mutluyum! assistant:
 
 Tam Çıktı:
-user: Bugün çok mutluyum! assistant: Ne güzel kanka böyle devam et sen hep mutlu ol bu enerjinle eminim harikasın 💖💫. ✍️🌸✨👵‍♀️🛌️ 🥦️ Mutlu pazarlar dilerim sana �
+user: Bugün çok mutluyum! assistant: Ooo, ne güzel! Pozitif enerji yaymışsın. İyi ki varsın kanka. Bi kahve içelim mi? Hep böyle ol. Keyfini çıkar canım benim. ‍ ‍ ‍ Yarın daha da mutlu olursun umarım. Müzik aç
 
 Sadece Yanıt:
-Ne güzel kanka böyle devam et sen hep mutlu ol bu enerjinle eminim harikasın 💖💫. ✍️🌸✨👵‍♀️🛌️ 🥦️ Mutlu pazarlar dilerim sana �
+Ooo, ne güzel! Pozitif enerji yaymışsın. İyi ki varsın kanka. Bi kahve içelim mi? Hep böyle ol. Keyfini çıkar canım benim. ‍ ‍ ‍ Yarın daha da mutlu olursun umarım. Müzik aç
 --------------------------------------------------------------------------------
 
 --- TEST 2 ---
 Prompt: user: İş yerinde sorun yaşıyorum. assistant:
 
 Tam Çıktı:
-user: İş yerinde sorun yaşıyorum. assistant: Sorun yok kanka düzelirsin zamanla ama sabret biraz 😤🧡‍♀️😔👨‍💻‍🌟‏✓️😬👑‍🦋‍�
+user: İş yerinde sorun yaşıyorum. assistant: Sorma ya, patron hep aynı şeyi yapıyor. Sıkıntıdan patlayacaksın. Çek git biraz daha. Boş ver işleri. Pes etme. Sen yoluna bakacaksın. ‍
+Ah canım bu devirde de var öyle şeyler, pes etmek yok.
 
 Sadece Yanıt:
-Sorun yok kanka düzelirsin zamanla ama sabret biraz 😤🧡‍♀️😔👨‍💻‍🌟‏✓️😬👑‍🦋‍�
+Sorma ya, patron hep aynı şeyi yapıyor. Sıkıntıdan patlayacaksın. Çek git biraz daha. Boş ver işleri. Pes etme. Sen yoluna bakacaksın. ‍
+Ah canım bu devirde de var öyle şeyler, pes etmek yok.
 --------------------------------------------------------------------------------
 
 --- TEST 3 ---
 Prompt: user: Yeni bir hobi edindim. assistant:
 
 Tam Çıktı:
-user: Yeni bir hobi edindim. assistant: Vay helal olsun sana! Çok güzel bi şey gerçekten yeni şeyler denemek insanı çok mutlu eder böyle hoş sohbetler etmek iyi gelir insana 🎉️🍀. 💳💪👌😇 👨‍🌸. �
+user: Yeni bir hobi edindim. assistant: Ne yapıyorsun? Resim, müzik falan yapsana biraz. Kafa dağıtırsın biraz. Çok güzel olur. Keyfine bak. Hadi bakalım, iyi eğlenceler.
+Yeni hobin hayırlı olsun kanka. Ellerine sağlık. Belki bende yaparım bu işi.
 
 Sadece Yanıt:
-Vay helal olsun sana! Çok güzel bi şey gerçekten yeni şeyler denemek insanı çok mutlu eder böyle hoş sohbetler etmek iyi gelir insana 🎉️🍀. 💳💪👌😇 👨‍🌸. �
+Ne yapıyorsun? Resim, müzik falan yapsana biraz. Kafa dağıtırsın biraz. Çok güzel olur. Keyfine bak. Hadi bakalım, iyi eğlenceler.
+Yeni hobin hayırlı olsun kanka. Ellerine sağlık. Belki bende yaparım bu işi.
 --------------------------------------------------------------------------------
 
 --- TEST 4 ---
 Prompt: user: Çok yorgunum. assistant:
 
 Tam Çıktı:
-user: Çok yorgunum. assistant: Gel bi kahve yapayım sana dinlen biraz. Yorgunluğunu atırsın belki. 😴🍽️‍♀️🕌️🌹 ☟‍❤️‍🗻 ✔️ 🛒 Diyet
+user: Çok yorgunum. assistant: Erken yat kendine gel, dinlen biraz. Yarın da dinlenemezsin. Yorgunluktan ölmezsin sen. İyi uykular aslanım. Dinlen artık. Kendine iyi bak. Sana da çok iyi gelir. 😂 Uyuduğun sürece dinç hissedersin
 
 Sadece Yanıt:
-Gel bi kahve yapayım sana dinlen biraz. Yorgunluğunu atırsın belki. 😴🍽️‍♀️🕌️🌹 ☟‍❤️‍🗻 ✔️ 🛒 Diyet
+Erken yat kendine gel, dinlen biraz. Yarın da dinlenemezsin. Yorgunluktan ölmezsin sen. İyi uykular aslanım. Dinlen artık. Kendine iyi bak. Sana da çok iyi gelir. 😂 Uyuduğun sürece dinç hissedersin
 --------------------------------------------------------------------------------
 
 --- TEST 5 ---
 Prompt: user: Harika bir haber aldım! assistant:
 
 Tam Çıktı:
-user: Harika bir haber aldım! assistant: Aa ne güzel ya sevindim senin adına tebrik ederim canım benim 🤗🌸🎉️. 👌‍♀️. 😇📩💪‍♂️👧‍⚖‍
+user: Harika bir haber aldım! assistant: Anlat hemen, merak ettim şimdi. Hadi bakalım, neymiş o. Hemen anlatırım sana. Meraklandırır beni birazdan. Sevgilerimle. 😊 🤗 Başarılar dilerim canım benim. 💕 ➡️ iyi haberlerini paylaş bizimle. Ne
 
 Sadece Yanıt:
-Aa ne güzel ya sevindim senin adına tebrik ederim canım benim 🤗🌸🎉️. 👌‍♀️. 😇📩💪‍♂️👧‍⚖‍
+Anlat hemen, merak ettim şimdi. Hadi bakalım, neymiş o. Hemen anlatırım sana. Meraklandırır beni birazdan. Sevgilerimle. 😊 🤗 Başarılar dilerim canım benim. 💕 ➡️ iyi haberlerini paylaş bizimle. Ne
 --------------------------------------------------------------------------------
 
 ================================================================================
