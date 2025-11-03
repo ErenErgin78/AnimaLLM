@@ -1,0 +1,23 @@
+/**
+ * Ana CSS Dosyası
+ * Tüm CSS modüllerini import eder
+ */
+
+/* Temalar */
+@import url('themes.css');
+
+/* Genel stiller, Container, Lightbox ve Responsive (birleştirildi) */
+@import url('base.css');
+
+/* Matrix canvas */
+@import url('matrix.css');
+
+/* Node sistemi */
+@import url('nodes.css');
+
+/* Emoji */
+@import url('emoji.css');
+
+/* Chat sistemi */
+@import url('chat.css');
+

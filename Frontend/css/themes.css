@@ -1,0 +1,39 @@
+/**
+ * Tema Sistemi CSS
+ * Light ve Dark tema değişkenleri
+ */
+
+:root {
+    /* Light theme renkleri */
+    --bg: #f5f5f5;
+    --text: #222;
+    --card-bg: #ffffff;
+    --surface: #fafafa;
+    --border: #ddd;
+    --muted: #666;
+    --primary: #007bff;
+    --primary-hover: #0056b3;
+    --on-primary: #ffffff;
+    --accent: #ffcc00;
+    --bubble-bg: #e9ecef;
+    --input-bg: #ffffff;
+    --matrix-color: #00aa55;
+}
+
+.dark {
+    /* Dark theme renkleri */
+    --bg: #0f141a;
+    --text: #e6edf3;
+    --card-bg: #161b22;
+    --surface: #0d1117;
+    --border: #30363d;
+    --muted: #9da7b0;
+    --primary: #1f6feb;
+    --primary-hover: #255fbd;
+    --on-primary: #ffffff;
+    --accent: #f2c744;
+    --bubble-bg: #21262d;
+    --input-bg: #0d1117;
+    --matrix-color: #23d18b;
+}
+
