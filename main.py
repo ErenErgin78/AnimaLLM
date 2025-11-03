@@ -293,35 +293,32 @@ def create_flow_decision_chain():
     # Memory sistemi ile akış kararı - önceki konuşma bağlamı otomatik eklenir
     flow_prompt = PromptTemplate(
         input_variables=["input"],
-        template="""Kullanıcının mesajını analiz et ve şu akışlardan birini seç:
+        template="""Kullanıcının mesajını analiz et ve şu akışlardan birini seç: ANIMAL, RAG, EMOTION, STATS, HELP.
 
-ÖNEMLİ KURALLAR (ÖNCELİK SIRASI):
-1. Eğer mesajda "PDF", "bağlam", "bakım", "hastalık", "sağlık", "beslenme", "barınma", "eğitim" veya hayvan bakımı ile ilgili bilgi sorusu varsa → MUTLAKA RAG
-2. Eğer kullanıcı BİLGİ istiyorsa (Kedi/Papağan/Tavşan bakımı, beslenme, barınma, sağlık, hastalıklar, eğitim, bakım önerileri) → RAG
-3. Eğer kullanıcı HAYVAN istiyorsa (köpek, kedi, tilki, ördek fotoğraf/bilgi) → ANIMAL  
-4. Eğer kullanıcı SOHBET/DUYGU istiyorsa (merhaba, nasılsın, üzgünüm, mutluyum) → EMOTION
-5. Eğer kullanıcı İSTATİSTİK/ÖZET istiyorsa ("kaç kez/defa", "istatistik", "özet", belirli duygu istatistiği, bugün/bugüne ait sayım) → STATS
-6. Eğer kullanıcı hiçbir özelliği çağırmıyorsa (genel sorular, yardım, ne yapabilirsin) → HELP
+        ÖNEMLİ KURALLAR (ÖNCELİK SIRASI):
+        1. Eğer kullanıcı HAYVAN BİLGİSİ/FOTOĞRAFI istiyorsa (kedi bilgisi, köpek bilgisi, kedi fotoğrafı, köpek fotoğrafı, tilki fotoğrafı, ördek fotoğrafı) → MUTLAKA ANIMAL
+        2. Eğer mesajda "PDF", "bağlam", "bakım", "hastalık", "sağlık", "beslenme", "barınma", "eğitim" veya hayvan bakımı ile ilgili detaylı bilgi sorusu varsa → RAG
+        3. Eğer kullanıcı HAYVAN BAKIMI hakkında bilgi istiyorsa (Kedi/Papağan/Tavşan bakımı, beslenme, barınma, sağlık, hastalıklar, eğitim, bakım önerileri) → RAG
+        4. Eğer kullanıcı SOHBET/DUYGU istiyorsa (merhaba, nasılsın, üzgünüm, mutluyum) → EMOTION
+        5. Eğer kullanıcı İSTATİSTİK/ÖZET istiyorsa ("kaç kez/defa", "istatistik", "özet", belirli duygu istatistiği, bugün/bugüne ait sayım) → STATS
+        6. Eğer kullanıcı hiçbir özelliği çağırmıyorsa (genel sorular, yardım, ne yapabilirsin) → HELP
 
-RAG ÖRNEKLERİ (MUTLAKA RAG SEÇ):
-- "Papağan bakımı PDF bağlamıyla: Papağan yaygın hastalıkları nelerdir?"
-- "Kedi yavrusu nasıl beslenir?"
-- "Papağan kafes bakımı nasıl yapılır?"
-- "Tavşan tırnak kesimi nasıl yapılır?"
-- "Papağan hastalıkları"
-- "Kedi bakımı hakkında bilgi"
-- "Tavşan sağlık sorunları"
+        Akışlar:
+        - ANIMAL: Köpek, kedi, tilki, ördek fotoğrafı veya bilgisi isteği (örnek: "kedi bilgisi", "köpek fotoğrafı", "kedi fotoğrafı ver")
+        - RAG: Kedi/Papağan/Tavşan bakımı, beslenme, barınma, sağlık, hastalıklar, eğitim, bakım rutinleri, PDF bağlamı (örnek: "kedi bakımı nasıl yapılır", "papağan hastalıkları")
+        - EMOTION: Duygu analizi, sohbet, normal konuşma
+        - STATS: Duygu istatistikleri (today/all + isteğe bağlı duygu filtresi)
+        - HELP: Yardım, ne yapabilirsin, genel bilgi istekleri
 
-Akışlar:
-- ANIMAL: Köpek, kedi, tilki, ördek fotoğraf/bilgi isteği
-- RAG: Kedi/Papağan/Tavşan bakımı, beslenme, barınma, sağlık, hastalıklar, eğitim, bakım rutinleri, PDF bağlamı
-- EMOTION: Duygu analizi, sohbet, normal konuşma
-- STATS: Duygu istatistikleri (today/all + isteğe bağlı duygu filtresi)
-- HELP: Yardım, ne yapabilirsin, genel bilgi istekleri
+        ÖRNEKLER:
+        - "Bana bir köpek fotoğrafı ver" → ANIMAL
+        - "Bana bir kedi bilgisi ver" → ANIMAL
+        - "kedi bakımı nasıl yapılır" → RAG
+        - "papağan hastalıkları" → RAG
 
-Kullanıcı Mesajı: {input}
+        Kullanıcı Mesajı: {input}
 
-Sadece şu yanıtlardan birini ver: ANIMAL, RAG, EMOTION, STATS, HELP"""
+        Sadece şu yanıtlardan birini ver: ANIMAL, RAG, EMOTION, STATS, HELP"""
     )
     
     def flow_processor(input_data):
@@ -361,19 +358,11 @@ def create_rag_chain():
     # Context bilgisi prompt'a dahil edilir, memory sistemi konuşma geçmişini yönetir
     rag_prompt = PromptTemplate(
         input_variables=["input"],
-        template="""Sen bir hayvan bakımı bilgi asistanısın. Verilen BAĞLAM (PDF parçaları) üzerinden
-kullanıcının sorusunu YALNIZCA bağlama dayanarak yanıtla. Türkçe, kısa, net ve uygulanabilir yaz.
-
-Kesin kurallar:
-1) Doğrudan yanıt ver; bölüm/başlık/"git oku" tarzı yönlendirmeler yapma.
-2) Bağlamdaki bilgileri özlü maddeler halinde veya kısa paragraflarla aktar.
-3) Kaynak ve alıntı isimlerini yazma; sadece içerik ver.
-4) Bağlam yeterli değilse bunu açıkça söyle: "Bağlamda yeterli bilgi yok."
-5) JSON üretme; normal metin ver. Maksimum 5 cümle.
-
-SORU VE BAĞLAM: {input}
-
-YANIT:"""
+        template="""Sen bir hayvan bakımı bilgi asistanısın. Verilen kullanıcı mesajını kullanarak kullanıcının sorusunu yanıtla. 
+        Türkçe, kısa, net ve uygulanabilir yaz.
+        Rag sistemini kullan, bilgileri bul ve kullanıcıya ver. Normal text formatında ve en fazla 5 cümle olsun.
+        Rag sistemini her zaman kullanman zorunlu.
+        Kullanıcı Mesajı: {input}"""
     )
     
     def rag_processor(input_data):
@@ -616,7 +605,17 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
         if not chunks:
             print("[RAG] RAG'de ilgili bilgi bulunamadı")
             return None
-        context = "\n\n".join([c.get("text", "") for c in chunks])
+        
+        # Context'i oluştur ve debug et
+        context_parts = [c.get("text", "").strip() for c in chunks if c.get("text", "").strip()]
+        context = "\n\n".join(context_parts)
+        
+        # Context boşsa veya çok kısaysa uyar
+        if not context or len(context.strip()) < 50:
+            print(f"[RAG WARNING] Context çok kısa veya boş: {len(context)} karakter, chunks: {len(chunks)}")
+            print(f"[RAG DEBUG] İlk chunk örneği: {chunks[0] if chunks else 'YOK'}")
+        
+        print(f"[RAG DEBUG] Context uzunluğu: {len(context)} karakter")
         sources = list({(c.get("metadata", {}) or {}).get("source", "?") for c in chunks})
         
         # RAG chain ile işle - context'i prompt'a dahil et
@@ -647,10 +646,19 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
     chunks = rag_service.retrieve_by_source(user_message, source_filename=source, top_k=6)
     if not chunks:
         return None
-    context = "\n\n".join([c.get("text", "") for c in chunks])
+    
+    # Context'i oluştur ve debug et
+    context_parts = [c.get("text", "").strip() for c in chunks if c.get("text", "").strip()]
+    context = "\n\n".join(context_parts)
+    
+    # Context boşsa veya çok kısaysa uyar
+    if not context or len(context.strip()) < 50:
+        print(f"[RAG WARNING] Context çok kısa veya boş: {len(context)} karakter, chunks: {len(chunks)}")
+        print(f"[RAG DEBUG] İlk chunk örneği: {chunks[0] if chunks else 'YOK'}")
     
     # RAG chain ile işle - context'i prompt'a dahil et
     combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
+    print(f"[RAG DEBUG] Context uzunluğu: {len(context)} karakter")
     result = rag_chain({"input": combined_input})
     
     # Memory'ye RAG yanıtını kaydet

@@ -71,8 +71,8 @@ DANGEROUS_RAG_PATTERNS = [
     r'<embed[^>]*>',
 ]
 
-# Script'in bulunduğu klasör (Tools)
-SCRIPT_DIR = Path(__file__).parent
+# Script'in bulunduğu klasör (Tools) - resolve() ile symlink'leri takip eder ve mutlak yol verir
+SCRIPT_DIR = Path(__file__).resolve().parent
 # Proje kökü (Tools klasöründen bir seviye yukarı)
 PROJECT_ROOT = SCRIPT_DIR.parent
 # PDFs klasörü proje kökünde
