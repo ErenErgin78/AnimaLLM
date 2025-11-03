@@ -12,12 +12,12 @@ const DRAGGABLES = [
     { id: 'fn-parent-stats', side: 'right', top: 120, right: 260, prompt: 'bugün kaç kere mutluluk tetikledin?' },
     
     // API child node'ları (sağ tarafta)
-    { id: 'fn-dog_photo', side: 'right', prompt: 'Bana bir köpek fotoğrafı ver', top: 120, right: 32 },
+    { id: 'fn-dog_photo', side: 'right', prompt: 'Bana bir köpek fotoğrafı ver', top: 100, right: 32 },
     { id: 'fn-dog_facts', side: 'right', prompt: 'Bana bir köpek bilgisi ver', top: 180, right: 32 },
-    { id: 'fn-cat_photo', side: 'right', prompt: 'Bana bir kedi fotoğrafı ver', top: 240, right: 32 },
-    { id: 'fn-cat_facts', side: 'right', prompt: 'Bana bir kedi bilgisi ver', top: 300, right: 32 },
-    { id: 'fn-fox_photo', side: 'right', prompt: 'Bana bir tilki fotoğrafı ver', top: 360, right: 32 },
-    { id: 'fn-duck_photo', side: 'right', prompt: 'Bana bir ördek fotoğrafı ver', top: 420, right: 32 },
+    { id: 'fn-cat_photo', side: 'right', prompt: 'Bana bir kedi fotoğrafı ver', top: 260, right: 32 },
+    { id: 'fn-cat_facts', side: 'right', prompt: 'Bana bir kedi bilgisi ver', top: 340, right: 32 },
+    { id: 'fn-fox_photo', side: 'right', prompt: 'Bana bir tilki fotoğrafı ver', top: 420, right: 32 },
+    { id: 'fn-duck_photo', side: 'right', prompt: 'Bana bir ördek fotoğrafı ver', top: 500, right: 32 },
     
     // RAG PDF node'ları (sol tarafta)
     { id: 'fn-pdf-python', side: 'left', prompt: 'Kedi bakımı PDF bağlamıyla: Kediler nerede barınmalı?', top: 140, left: 32 },
@@ -518,6 +518,7 @@ function initRopes() {
 function ropeEndpoints(key) {
     const container = document.querySelector('.container');
     const node = document.getElementById('fn-' + key) || document.getElementById('fn-parent-' + key.split('parent-')[1]);
+    // Container kenarına bağlan
     const cRect = container.getBoundingClientRect();
     const nRect = node.getBoundingClientRect();
     const cfg = DRAGGABLES.find(c => c.id === 'fn-' + key) || { side: 'left', anchorRatio: 0.5 };
@@ -542,9 +543,23 @@ function ropeEndpoints(key) {
         };
     }
     
-    // Parent wire'lar container kenarına bağlanır
+    // Parent wire'lar container/chat kenarına bağlanır
     if (key === 'parent-api' || key === 'parent-rag' || key === 'parent-plain' || key === 'parent-stats') {
-        const anchorY = Math.min(Math.max(cRect.top + 0.5 * cRect.height, cRect.top + 24), cRect.bottom - 24);
+        // Üst/alt ayrımı sabit oranla (daha belirgin ayrım):
+        // CHAT(plain) ve STATS üstte, RAG ve API altta
+        const h = Math.max(1, cRect.height);
+        const ratioTop = 0.40;   // üst bağlantı oranı
+        const ratioBottom = 0.60; // alt bağlantı oranı
+        const ratioMap = {
+            'parent-plain': ratioTop,
+            'parent-stats': ratioTop,
+            'parent-rag': ratioBottom,
+            'parent-api': ratioBottom,
+        };
+        const ratio = ratioMap[key] ?? 0.5;
+        let anchorY = cRect.top + ratio * h;
+        // Kenar tamponlarını koru
+        anchorY = Math.min(Math.max(anchorY, cRect.top + 24), cRect.bottom - 24);
         const side = (key === 'parent-api' || key === 'parent-stats') ? 'right' : 'left';
         return {
             startX: nRect.left + nRect.width / 2,

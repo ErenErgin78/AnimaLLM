@@ -8,13 +8,13 @@
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 1;
+    z-index: 2;
 }
 
 /* Func node stilleri */
 .func-node {
     position: fixed;
-    z-index: 2;
+    z-index: 3;
     pointer-events: auto;
     background: var(--bubble-bg);
     color: var(--text);
