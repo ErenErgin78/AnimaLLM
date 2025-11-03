@@ -157,9 +157,9 @@ Tarayıcınızda: `http://localhost:8000/`
 ## 🎯 Kullanım Örnekleri
 
 ### RAG Sistemi
-- **"Python nedir?"** → 🐍 Python PDF'den bilgi
-- **"Clean Architecture principles"** → 🏗️ Clean Architecture PDF'den bilgi
-- **"Anayasa temel haklar"** → ⚖️ Anayasa PDF'den bilgi
+- **"Kedi yavrusu nasıl beslenir?"** → 🐱 `PDFs/cat_care.pdf`
+- **"Papağan kafes bakımı nasıl olmalı?"** → 🦜 `PDFs/parrot_care.pdf`
+- **"Tavşan tırnak kesimi nasıl yapılır?"** → 🐰 `PDFs/rabbit_care.pdf`
 
 ### Hayvan Sistemi
 - **"köpek fotoğrafı ver"** → 🐶 Köpek fotoğrafı + düğüm parlaması
@@ -217,25 +217,34 @@ Tarayıcınızda: `http://localhost:8000/`
 
 ### Dosya Yapısı
 ```
-├── api_web_chatbot.py     # Ana koordinatör (LangChain entegrasyonu)
-├── emotion_system.py      # Duygu analizi sistemi
-├── animal_system.py       # Hayvan API sistemi (2. hafta)
-├── rag_service.py         # RAG sistemi (4. hafta)
-├── statistic_system.py    # İstatistik sistemi
-├── static/
-│   ├── app.css           # Tüm stiller
-│   └── app.js            # Frontend mantığı
-├── templates/
-│   └── index.html        # Web sayfası
-├── data/
-│   ├── mood_emojis.json  # Duygu emojileri
-│   ├── chat_history.txt  # Konuşma geçmişi
-│   └── mood_counter.txt  # Duygu istatistikleri
-└── PDFs/                 # RAG için PDF dosyaları
-    ├── Learning_Python.pdf
-    ├── gerekceli_anayasa.pdf
-    └── clean_architecture.pdf
+├── main.py                 # FastAPI ana uygulama (LangChain koordinatörü)
+├── Tools/                  # Backend modülleri (modüler)
+│   ├── animal_system.py    # Hayvan API sistemi
+│   ├── emotion_system.py   # Duygu sistemi (LoRA + LLM)
+│   ├── rag_service.py      # RAG servisi
+│   └── statistic_system.py # İstatistik sistemi
+├── Frontend/               # Tüm frontend varlıkları
+│   ├── html/index.html     # Web sayfası (UI)
+│   ├── css/                # Stil dosyaları (themes.css, base.css, nodes.css ...)
+│   └── js/                 # JS modülleri (app.js, nodes.js, chat.js ...)
+├── data/                   # Kalıcı veriler (proje kökü)
+│   ├── mood_emojis.json    # Duygu emojileri
+│   ├── chat_history.txt    # Konuşma geçmişi kayıtları
+│   └── mood_counter.txt    # Zaman damgalı duygu kayıtları
+└── PDFs/                   # RAG için PDF kaynakları
+    ├── cat_care.pdf        # Kedi bakımı
+    ├── parrot_care.pdf     # Papağan bakımı
+    └── rabbit_care.pdf     # Tavşan bakımı
+└── Lora/
+    ├── Code/               # LoRA eğitim/güncelleme betikleri (opsiyonel)
+    ├── Data/               # LoRA eğitim verileri (örn. final.json)
+    └── Model/
+        └── main/           # Adapter + tokenizer (adapter_model.safetensors, adapter_config.json, tokenizer.json)
 ```
+
+Önemli notlar:
+- LoRA: `Lora/Model/main/` altında adapter dosyaları bulunur ve `Tools/emotion_system.py` tarafından proje kökünden yüklenir.
+- Static servis: `main.py` HTML'i `Frontend/html/index.html`'den, CSS/JS'yi `Frontend/` altından `/static/...` yolu ile sunar ve otomatik cache-busting uygular.
 
 ---
 
