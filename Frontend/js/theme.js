@@ -18,19 +18,48 @@ function applyTheme(theme) {
 }
 
 /**
+ * Matrix canvas'ını temizler (tema değişikliği için)
+ */
+function clearMatrixCanvas() {
+    try {
+        // Matrix canvas'ını hemen temizle (yeni renklerle başlamak için)
+        if (typeof matrixCanvas !== 'undefined' && matrixCanvas && typeof matrixCtx !== 'undefined' && matrixCtx) {
+            matrixCtx.clearRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+        }
+    } catch (e) {
+        // Hata olsa da sessizce devam et
+    }
+}
+
+/**
  * Tema değiştirir
  */
 function toggleTheme() {
     const root = document.documentElement;
+    const body = document.body;
     const isDark = root.classList.contains('dark');
+    
     // Tema geçişinde tüm animasyonları geçici olarak devre dışı bırak
-    try {
-        root.classList.add('no-anim');
-        applyTheme(isDark ? 'light' : 'dark');
-        // Bir sonraki frame'de no-anim sınıfını kaldır
-        setTimeout(() => root.classList.remove('no-anim'), 0);
-    } catch (_) {
-        applyTheme(isDark ? 'light' : 'dark');
-    }
+    // no-anim sınıfını önce ekle (animasyonları kapat)
+    root.classList.add('no-anim');
+    body.classList.add('no-anim');
+    
+    // Matrix canvas'ını hemen temizle (yeni renklerle başlamak için)
+    clearMatrixCanvas();
+    
+    // Tema değişikliğini hemen yap (animasyonsuz)
+    applyTheme(isDark ? 'light' : 'dark');
+    
+    // Matrix canvas'ını bir kez daha temizle (tema değişikliğinden sonra)
+    clearMatrixCanvas();
+    
+    // Tema değişikliği tamamlandıktan sonra no-anim sınıfını kaldır
+    // requestAnimationFrame ile bir sonraki frame'de kaldır
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            root.classList.remove('no-anim');
+            body.classList.remove('no-anim');
+        });
+    });
 }
 

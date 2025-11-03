@@ -325,11 +325,11 @@ class EmotionChatbot:
                 self._lora_loaded = True
                 return
             
-            print(f"[LoRA] Base model yükleniyor: ytu-ce-cosmos/turkish-gpt2-medium")
+            print(f"[LoRA] Base model yükleniyor: ytu-ce-cosmos/turkish-gpt2-large")
             print(f"[LoRA] Adaptör yolu: {lora_path}")
             
             # Base model ve tokenizer'ı yükle
-            base_model_name = "ytu-ce-cosmos/turkish-gpt2-medium"
+            base_model_name = "ytu-ce-cosmos/turkish-gpt2-large"
             use_gpu = torch.cuda.is_available()
             
             base_model = GPT2LMHeadModel.from_pretrained(

@@ -45,7 +45,8 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
   - **Akış Yönlendirme Chain'i**: LLM ile otomatik akış seçimi
   - **Modüler Chain'ler**: Her sistem ayrı chain olarak çalışır
 
-- **Öğrenilen Konular**: PEFT/LoRA, sentetik veri üretimi, adapter tabanlı fine-tuning, inference optimizasyonu
+### ⚡ **6. Hafta: Fine Tuning ve LORA**
+- **Öğrenilen Konular**: PEFT/LoRA,  adapter tabanlı fine-tuning, inference optimizasyonu
 - **Veri Üretimi (Gemini)**: Gemini API ile otomatik loop kurularak ≈12.5k Türkçe diyalog ve duygu örneği üretildi (sentetik dataset)
 - **Model Eğitimi**: `ytu-ce-cosmos/turkish-gpt2-medium` tabanlı LoRA adapter eğitildi (r=16, alpha=32, dropout=0.05)
 - **Eğitim Detayları**: 5 epoch, batch size 2, gradient accumulation 16 (effective batch 32), bf16; RTX 4060 (CUDA 12.1). train_loss ≈ 2.01; ≈12.5k diyalog (train 11,240 / val 1,249)

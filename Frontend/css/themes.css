@@ -37,3 +37,22 @@
     --matrix-color: #23d18b;
 }
 
+/* Tema geçişinde tüm renk geçişlerini anlık yap */
+.no-anim,
+.no-anim *,
+.no-anim *::before,
+.no-anim *::after {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Background ve color transition'larını kapat */
+.no-anim {
+    transition: none !important;
+}
+
+.no-anim * {
+    transition-property: none !important;
+    animation: none !important;
+}
+

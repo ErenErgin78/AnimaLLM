@@ -15,7 +15,7 @@ google-generativeai>=0.8.0
 chromadb==0.5.5
 sentence-transformers==3.0.1
 pypdf==4.3.1
-
+PyPDF2
 
 # Summarizer (T5-small via transformers)
 transformers==4.45.2
@@ -23,12 +23,14 @@ sentencepiece==0.2.0
 safetensors==0.4.5
 
 # LoRA Fine-Tuning dependencies
-pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch --index-url https://download.pytorch.org/whl/cu121
 peft>=0.6.0  # Parameter Efficient Fine-Tuning (LoRA için)
 datasets>=2.14.0  # Hugging Face datasets
 accelerate>=0.24.0  # Training hızlandırma ve GPU yönetimi (CPU'da da çalışır)
 numpy>=1.24.0  # Numerik işlemler (genellikle torch ile gelir ama ek güvenlik için)
 hf_xet
+hf_transfer
+huggingface_hub[cli]
 
 # NOT: GPU kullanmak için PyTorch CUDA versiyonu kurulmalıdır:
 # CUDA 12.1: pip install torch --index-url https://download.pytorch.org/whl/cu121

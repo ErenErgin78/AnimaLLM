@@ -295,16 +295,26 @@ def create_flow_decision_chain():
         input_variables=["input"],
         template="""Kullanıcının mesajını analiz et ve şu akışlardan birini seç:
 
-ÖNEMLİ KURALLAR:
-1. Eğer kullanıcı BİLGİ istiyorsa (hayvan bakımı, beslenme, barınma, sağlık, eğitim, bakım önerileri) → RAG
-2. Eğer kullanıcı HAYVAN istiyorsa (köpek, kedi, tilki, ördek fotoğraf/bilgi) → ANIMAL  
-3. Eğer kullanıcı SOHBET/DUYGU istiyorsa (merhaba, nasılsın, üzgünüm, mutluyum) → EMOTION
-4. Eğer kullanıcı İSTATİSTİK/ÖZET istiyorsa ("kaç kez/defa", "istatistik", "özet", belirli duygu istatistiği, bugün/bugüne ait sayım) → STATS
-5. Eğer kullanıcı hiçbir özelliği çağırmıyorsa (genel sorular, yardım, ne yapabilirsin) → HELP
+ÖNEMLİ KURALLAR (ÖNCELİK SIRASI):
+1. Eğer mesajda "PDF", "bağlam", "bakım", "hastalık", "sağlık", "beslenme", "barınma", "eğitim" veya hayvan bakımı ile ilgili bilgi sorusu varsa → MUTLAKA RAG
+2. Eğer kullanıcı BİLGİ istiyorsa (Kedi/Papağan/Tavşan bakımı, beslenme, barınma, sağlık, hastalıklar, eğitim, bakım önerileri) → RAG
+3. Eğer kullanıcı HAYVAN istiyorsa (köpek, kedi, tilki, ördek fotoğraf/bilgi) → ANIMAL  
+4. Eğer kullanıcı SOHBET/DUYGU istiyorsa (merhaba, nasılsın, üzgünüm, mutluyum) → EMOTION
+5. Eğer kullanıcı İSTATİSTİK/ÖZET istiyorsa ("kaç kez/defa", "istatistik", "özet", belirli duygu istatistiği, bugün/bugüne ait sayım) → STATS
+6. Eğer kullanıcı hiçbir özelliği çağırmıyorsa (genel sorular, yardım, ne yapabilirsin) → HELP
+
+RAG ÖRNEKLERİ (MUTLAKA RAG SEÇ):
+- "Papağan bakımı PDF bağlamıyla: Papağan yaygın hastalıkları nelerdir?"
+- "Kedi yavrusu nasıl beslenir?"
+- "Papağan kafes bakımı nasıl yapılır?"
+- "Tavşan tırnak kesimi nasıl yapılır?"
+- "Papağan hastalıkları"
+- "Kedi bakımı hakkında bilgi"
+- "Tavşan sağlık sorunları"
 
 Akışlar:
 - ANIMAL: Köpek, kedi, tilki, ördek fotoğraf/bilgi isteği
-- RAG: Kedi/Papağan/Tavşan bakımı, beslenme, barınma, sağlık, eğitim, bakım rutinleri
+- RAG: Kedi/Papağan/Tavşan bakımı, beslenme, barınma, sağlık, hastalıklar, eğitim, bakım rutinleri, PDF bağlamı
 - EMOTION: Duygu analizi, sohbet, normal konuşma
 - STATS: Duygu istatistikleri (today/all + isteğe bağlı duygu filtresi)
 - HELP: Yardım, ne yapabilirsin, genel bilgi istekleri

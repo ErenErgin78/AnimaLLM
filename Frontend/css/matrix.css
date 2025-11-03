@@ -10,5 +10,13 @@
     height: 100%;
     z-index: 0;
     pointer-events: none;
+    transition: none !important;
+}
+
+/* Tema geçişinde matrix canvas'ında transition'ı kapat */
+.no-anim #matrix-canvas {
+    transition: none !important;
+    transition-property: none !important;
+    animation: none !important;
 }
 

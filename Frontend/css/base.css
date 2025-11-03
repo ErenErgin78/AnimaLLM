@@ -15,9 +15,22 @@ body {
 }
 
 /* Tema değişiminde animasyonları tamamen kapatmak için yardımcı sınıf */
-.no-anim *, .no-anim *::before, .no-anim *::after {
+.no-anim, .no-anim *, .no-anim *::before, .no-anim *::after {
     transition: none !important;
+    transition-property: none !important;
     animation: none !important;
+}
+
+/* Tema geçişi için body ve html elementlerinde transition'ı kapat */
+html.no-anim, body.no-anim {
+    transition: none !important;
+    transition-property: none !important;
+    animation: none !important;
+}
+
+/* Background ve color transition'larını kapat */
+.no-anim * {
+    transition-property: none !important;
 }
 
 h1 {

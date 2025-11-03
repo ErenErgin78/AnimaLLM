@@ -71,9 +71,14 @@ DANGEROUS_RAG_PATTERNS = [
     r'<embed[^>]*>',
 ]
 
-ROOT_DIR = Path(__file__).parent
-PDFS_DIR = ROOT_DIR / "PDFs"
-CHROMA_DIR = ROOT_DIR / ".chroma"
+# Script'in bulunduğu klasör (Tools)
+SCRIPT_DIR = Path(__file__).parent
+# Proje kökü (Tools klasöründen bir seviye yukarı)
+PROJECT_ROOT = SCRIPT_DIR.parent
+# PDFs klasörü proje kökünde
+PDFS_DIR = PROJECT_ROOT / "PDFs"
+# ChromaDB klasörü proje kökünde (cache için)
+CHROMA_DIR = PROJECT_ROOT / ".chroma"
 COLLECTION_NAME = "project_pdfs"
 
 
