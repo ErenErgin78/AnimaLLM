@@ -4,8 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Duygu Chatbot</title>
-    <!-- CSS Modülleri -->
-    <link rel="stylesheet" href="/static/css/app.css">
+    <!-- CSS Modülleri (tek tek, cache-busting sunucu tarafından eklenecek) -->
+    <link rel="stylesheet" href="/static/css/themes.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/matrix.css">
+    <link rel="stylesheet" href="/static/css/nodes.css">
+    <link rel="stylesheet" href="/static/css/emoji.css">
+    <link rel="stylesheet" href="/static/css/chat.css">
     
     <!-- JavaScript Modülleri (sıra önemli!) -->
     <script src="/static/js/utils.js"></script>
@@ -20,6 +25,12 @@
 <body>
     <!-- Matrix rain canvas - arka planda akan karakterler -->
     <canvas id="matrix-canvas"></canvas>
+
+    <!-- Sağ üst aksiyon butonları (container dışı, tüm sayfa üzerinde) -->
+    <div class="top-actions">
+        <button class="action-btn" onclick="toggleTheme()">🌗 Tema</button>
+        <button class="action-btn" onclick="toggleMatrix()">🧪 Matrix</button>
+    </div>
     
     <!-- SVG wires - node'lar arası bağlantı çizgileri -->
     <svg id="wires" class="wires"></svg>
@@ -56,7 +67,6 @@
     <div class="container">
         <h1>
             Animal-Emotion Chatbot
-            <button class="theme-btn" onclick="toggleTheme()">🌗 Tema</button>
         </h1>
         
         <!-- Yüz emoji container'ı -->

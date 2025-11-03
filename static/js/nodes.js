@@ -6,18 +6,18 @@
 // Draggable node'ların konfigürasyonu
 const DRAGGABLES = [
     // Parent hub'lar
-    { id: 'fn-parent-rag', side: 'left', top: 220, left: 160 },
-    { id: 'fn-parent-api', side: 'right', top: 220, right: 160 },
-    { id: 'fn-parent-plain', side: 'left', top: 120, left: 260, prompt: 'Bugün çok kötü hissediyorum :(' },
-    { id: 'fn-parent-stats', side: 'right', top: 120, right: 260, prompt: 'bugün kaç kere mutluluk tetikledin?' },
+    { id: 'fn-parent-rag', side: 'left', top: 520, left: 260 },
+    { id: 'fn-parent-api', side: 'right', top: 520, right: 260 },
+    { id: 'fn-parent-plain', side: 'left', top: 140, left: 260, prompt: 'Yeni bir hobi edindim.' },
+    { id: 'fn-parent-stats', side: 'right', top: 140, right: 260, prompt: 'bugün kaç kere mutluluk tetikledin?' },
     
     // API child node'ları (sağ tarafta)
     { id: 'fn-dog_photo', side: 'right', prompt: 'Bana bir köpek fotoğrafı ver', top: 100, right: 32 },
-    { id: 'fn-dog_facts', side: 'right', prompt: 'Bana bir köpek bilgisi ver', top: 180, right: 32 },
-    { id: 'fn-cat_photo', side: 'right', prompt: 'Bana bir kedi fotoğrafı ver', top: 260, right: 32 },
-    { id: 'fn-cat_facts', side: 'right', prompt: 'Bana bir kedi bilgisi ver', top: 340, right: 32 },
-    { id: 'fn-fox_photo', side: 'right', prompt: 'Bana bir tilki fotoğrafı ver', top: 420, right: 32 },
-    { id: 'fn-duck_photo', side: 'right', prompt: 'Bana bir ördek fotoğrafı ver', top: 500, right: 32 },
+    { id: 'fn-dog_facts', side: 'right', prompt: 'Bana bir köpek bilgisi ver', top: 200, right: 32 },
+    { id: 'fn-cat_photo', side: 'right', prompt: 'Bana bir kedi fotoğrafı ver', top: 300, right: 32 },
+    { id: 'fn-cat_facts', side: 'right', prompt: 'Bana bir kedi bilgisi ver', top: 400, right: 32 },
+    { id: 'fn-fox_photo', side: 'right', prompt: 'Bana bir tilki fotoğrafı ver', top: 500, right: 32 },
+    { id: 'fn-duck_photo', side: 'right', prompt: 'Bana bir ördek fotoğrafı ver', top: 600, right: 32 },
     
     // RAG PDF node'ları (sol tarafta)
     { id: 'fn-pdf-python', side: 'left', prompt: 'Kedi bakımı PDF bağlamıyla: Kediler nerede barınmalı?', top: 140, left: 32 },

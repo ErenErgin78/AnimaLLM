@@ -11,6 +11,7 @@ let matrixDrops = [];
 let matrixFontSize = 16;
 let matrixInterval = 60; // milisaniye cinsinden güncelleme aralığı
 let matrixLastTs = 0;
+let matrixEnabled = true; // Matrix efektinin açık/kapalı durumu
 
 // Matrix'te görünecek karakterler
 const matrixChars = '01ABCDEFGHIJKLMNOPQRSTUVWXYZあいうえおｱｲｳｴｵ+-*/<>#$%&';
@@ -64,6 +65,12 @@ function drawMatrix(ts) {
     
     matrixLastTs = ts;
     if (!matrixCtx || !matrixCanvas) return;
+    if (!matrixEnabled) {
+        // Kapalıysa canvas'ı temizle ve beklemeye devam et
+        matrixCtx.clearRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+        requestAnimationFrame(drawMatrix);
+        return;
+    }
     
     // Arka plan için hafif fade efekti
     const bgColor = getComputedStyle(document.documentElement)
@@ -95,5 +102,20 @@ function drawMatrix(ts) {
     }
     
     requestAnimationFrame(drawMatrix);
+}
+
+/**
+ * Matrix efektini aç/kapat
+ */
+function toggleMatrix() {
+    try {
+        matrixEnabled = !matrixEnabled;
+        if (matrixCanvas) {
+            // Görünümü de güncelle (performans için)
+            matrixCanvas.style.display = matrixEnabled ? '' : 'none';
+        }
+    } catch (e) {
+        // Hata olsa da sessizce devam et
+    }
 }
 
