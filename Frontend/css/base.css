@@ -53,14 +53,55 @@ pre {
     cursor: pointer;
 }
 
-/* Sağ üst aksiyonlar (Tema/Matrix) */
-.top-actions {
+/* Sağ üst kullanıcı butonları */
+.top-right-actions {
     position: fixed;
     top: 24px;
     right: 24px;
     left: auto;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    gap: 12px;
+    align-items: center;
+    z-index: 1100; /* lightbox(1000) üstü */
+    pointer-events: auto;
+    opacity: 1 !important;
+    transition: none !important;
+}
+
+.top-right-actions #user-info {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    align-items: center;
+}
+
+.user-email {
+    color: var(--text);
+    font-size: 14px;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.28);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 14px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.top-right-actions .action-btn {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Sol alt aksiyonlar (Tema/Matrix/Flower) */
+.bottom-left-actions {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    right: auto;
+    display: flex;
+    flex-direction: row;
     gap: 12px;
     z-index: 1100; /* lightbox(1000) üstü */
     pointer-events: auto;
@@ -255,6 +296,35 @@ pre {
     .func-node {
         padding: 10px 14px;
         font-size: 14px;
+    }
+    
+    .top-right-actions {
+        top: 12px;
+        right: 12px;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .top-right-actions .action-btn {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+    
+    .user-email {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+    
+    .bottom-left-actions {
+        bottom: 12px;
+        left: 12px;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .bottom-left-actions .action-btn {
+        padding: 8px 12px;
+        font-size: 13px;
     }
 }
 
