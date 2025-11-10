@@ -43,11 +43,11 @@ function fitFaceEmoji() {
     const node = document.getElementById('face-emoji');
     if (!container || !node) return;
     
-    const maxW = container.clientWidth - 16;
-    const maxH = container.clientHeight - 16;
-    let size = 96;
+    const maxW = container.clientWidth - 1rem; /* 16px */
+    const maxH = container.clientHeight - 1rem; /* 16px */
+    let size = 6; /* 96px = 6rem */
     
-    node.style.fontSize = size + 'px';
+    node.style.fontSize = size + 'rem';
     node.style.whiteSpace = 'nowrap';
     
     // Boyut kontrolü ve ayarlama
@@ -55,8 +55,8 @@ function fitFaceEmoji() {
         const w = node.scrollWidth;
         const h = node.scrollHeight;
         if (w <= maxW && h <= maxH) break;
-        size = Math.max(24, Math.floor(size * 0.9));
-        node.style.fontSize = size + 'px';
+        size = Math.max(1.5, size * 0.9); /* 24px = 1.5rem */
+        node.style.fontSize = size + 'rem';
     }
 }
 

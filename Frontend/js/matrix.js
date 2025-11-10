@@ -37,8 +37,9 @@ function resizeMatrix() {
     matrixCanvas.width = window.innerWidth;
     matrixCanvas.height = window.innerHeight;
     
-    // Font boyutunu ekran genişliğine göre ayarla
-    matrixFontSize = Math.max(12, Math.floor(window.innerWidth / 90));
+    // Font boyutunu ekran genişliğine göre ayarla (rem cinsinden)
+    const baseFontSize = Math.max(0.75, Math.floor(window.innerWidth / 90) / 16); /* 12px = 0.75rem */
+    matrixFontSize = baseFontSize * 16; // px cinsinden sakla (canvas için)
     matrixCtx.font = `${matrixFontSize}px monospace`;
     
     // Kolon sayısını hesapla

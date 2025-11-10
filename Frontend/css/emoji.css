@@ -4,49 +4,49 @@
  */
 
 .face-container {
-    width: 220px;
-    height: 260px;
-    margin: 0 auto 20px;
+    width: 13.75rem; /* 220px */
+    height: 16.25rem; /* 260px */
+    margin: 0 auto 1.25rem; /* 20px */
     background: var(--card-bg);
-    border: 2px solid var(--border);
+    border: 0.125rem solid var(--border); /* 2px */
     border-radius: 50%;
-    box-shadow: inset 0 10px 30px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.06);
+    box-shadow: inset 0 0.625rem 1.875rem rgba(0,0,0,0.07), 0 0.25rem 0.75rem rgba(0,0,0,0.06); /* inset 0 10px 30px, 0 4px 12px */
     display: grid;
     place-items: center;
     overflow: hidden;
-    padding: 8px;
+    padding: 0.5rem; /* 8px */
 }
 
 .face-container.glow-api {
-    box-shadow: 0 0 0 2px rgba(13,110,253,0.7), 0 0 22px rgba(13,110,253,0.6), 
-                inset 0 10px 30px rgba(0,0,0,0.07), inset 0 0 0 1px rgba(13,110,253,0.7);
+    box-shadow: 0 0 0 0.125rem rgba(13,110,253,0.7), 0 0 1.375rem rgba(13,110,253,0.6), 
+                inset 0 0.625rem 1.875rem rgba(0,0,0,0.07), inset 0 0 0 0.0625rem rgba(13,110,253,0.7); /* 0 0 0 2px, 0 0 22px, inset 0 10px 30px, inset 0 0 0 1px */
     border-color: rgba(13,110,253,0.9);
     transition: box-shadow 240ms ease, border-color 240ms ease;
 }
 
 .face-container.glow-rag {
-    box-shadow: 0 0 0 2px rgba(255,193,7,0.7), 0 0 22px rgba(255,193,7,0.6), 
-                inset 0 10px 30px rgba(0,0,0,0.07), inset 0 0 0 1px rgba(255,193,7,0.7);
+    box-shadow: 0 0 0 0.125rem rgba(255,193,7,0.7), 0 0 1.375rem rgba(255,193,7,0.6), 
+                inset 0 0.625rem 1.875rem rgba(0,0,0,0.07), inset 0 0 0 0.0625rem rgba(255,193,7,0.7); /* 0 0 0 2px, 0 0 22px, inset 0 10px 30px, inset 0 0 0 1px */
     border-color: rgba(255,193,7,0.9);
     transition: box-shadow 240ms ease, border-color 240ms ease;
 }
 
 .face-container.glow-plain {
-    box-shadow: 0 0 0 2px rgba(52,199,89,0.7), 0 0 22px rgba(52,199,89,0.6), 
-                inset 0 10px 30px rgba(0,0,0,0.07), inset 0 0 0 1px rgba(52,199,89,0.7);
+    box-shadow: 0 0 0 0.125rem rgba(52,199,89,0.7), 0 0 1.375rem rgba(52,199,89,0.6), 
+                inset 0 0.625rem 1.875rem rgba(0,0,0,0.07), inset 0 0 0 0.0625rem rgba(52,199,89,0.7); /* 0 0 0 2px, 0 0 22px, inset 0 10px 30px, inset 0 0 0 1px */
     border-color: rgba(52,199,89,0.9);
     transition: box-shadow 240ms ease, border-color 240ms ease;
 }
 
 .face-container.glow-stats {
-    box-shadow: 0 0 0 2px rgba(186,85,211,0.7), 0 0 22px rgba(186,85,211,0.6), 
-                inset 0 10px 30px rgba(0,0,0,0.07), inset 0 0 0 1px rgba(186,85,211,0.7);
+    box-shadow: 0 0 0 0.125rem rgba(186,85,211,0.7), 0 0 1.375rem rgba(186,85,211,0.6), 
+                inset 0 0.625rem 1.875rem rgba(0,0,0,0.07), inset 0 0 0 0.0625rem rgba(186,85,211,0.7); /* 0 0 0 2px, 0 0 22px, inset 0 10px 30px, inset 0 0 0 1px */
     border-color: rgba(186,85,211,0.9);
     transition: box-shadow 240ms ease, border-color 240ms ease;
 }
 
 .face-emoji {
-    font-size: 96px;
+    font-size: 6rem; /* 96px */
     line-height: 1;
     transition: transform 200ms ease, opacity 200ms ease;
     white-space: nowrap;

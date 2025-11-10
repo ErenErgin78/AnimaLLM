@@ -157,7 +157,7 @@ async function sendMessage() {
                 img.src = data.image_url;
                 img.alt = data.animal + ' image';
                 img.style.maxWidth = '100%';
-                img.style.borderRadius = '6px';
+                img.style.borderRadius = '0.375rem'; /* 6px */
                 img.style.cursor = 'zoom-in';
                 img.addEventListener('click', () => openLightbox(data.image_url));
                 
