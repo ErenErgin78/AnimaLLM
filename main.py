@@ -30,9 +30,22 @@ from Tools.statistic_system import StatisticSystem
 from Tools.animal_system import route_animals, _animal_emoji
 from Tools.rag_service import rag_service
 
+# Auth modüllerini import et
+from Auth.routes import router as auth_router
+from Auth.database import init_db
+
 load_dotenv()
 
 app = FastAPI(title="CHAIN SYSTEM - Akıllı Chatbot Sistemi", version="3.0.0")
+
+# Auth router'ını ekle
+app.include_router(auth_router)
+
+# Veritabanını başlat - uygulama başlangıcında tabloları oluştur
+try:
+    init_db()
+except Exception as e:
+    print(f"[MAIN ERROR] Veritabanı başlatma hatası: {e}")
 
 # LangChain LLM instance - Fallback mekanizması ile
 def get_llm():
@@ -714,33 +727,50 @@ main_chain = create_main_processing_chain()
 # FASTAPI ENDPOINTS
 # =============================================================================
 
-@app.get("/", response_class=HTMLResponse)
-def index() -> HTMLResponse:
-    """Ana sayfa HTML'ini döndürür"""
-    # Frontend HTML yolu (templates yerine Frontend/html)
-    template_path = Path(__file__).parent / "Frontend" / "html" / "index.html"
+def _load_html_template(filename: str) -> str:
+    """
+    HTML template dosyasını yükler ve cache-busting ekler
+    """
+    template_path = Path(__file__).parent / "Frontend" / "html" / filename
     try:
         html = template_path.read_text(encoding="utf-8")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"HTML yüklenemedi: {e}")
     try:
         # Cache-busting: static dosya URL'lerine versiyon parametresi ekle
-        # Güvenli regex ile sadece query olmayan /static yollarına ?v=TIMESTAMP ekler
         import time
-        version = str(int(time.time()))  # Uygulama başına değişir; dev için idealdir
+        version = str(int(time.time()))
 
         def _add_version(m):
-            # Grup 1: href/src="  | Grup 2: /static/... | Grup 3: " veya '
             prefix, path, suffix = m.group(1), m.group(2), m.group(3)
             if '?' in path:
                 return f"{prefix}{path}{suffix}"
             return f"{prefix}{path}?v={version}{suffix}"
 
-        # href/src özniteliklerinde /static ile başlayan yolları hedefle
         html = re.sub(r"((?:href|src)=[\"'])((?:/static/)[^\"'<>]+)([\"'])", _add_version, html, flags=re.IGNORECASE)
     except Exception:
-        # Cache-bust işlemi başarısız olsa bile sayfayı döndür
         pass
+    return html
+
+
+@app.get("/", response_class=HTMLResponse)
+def index() -> HTMLResponse:
+    """Ana sayfa HTML'ini döndürür"""
+    html = _load_html_template("index.html")
+    return HTMLResponse(content=html)
+
+
+@app.get("/register.html", response_class=HTMLResponse)
+def register_page() -> HTMLResponse:
+    """Kayıt sayfası HTML'ini döndürür"""
+    html = _load_html_template("register.html")
+    return HTMLResponse(content=html)
+
+
+@app.get("/login.html", response_class=HTMLResponse)
+def login_page() -> HTMLResponse:
+    """Giriş sayfası HTML'ini döndürür"""
+    html = _load_html_template("login.html")
     return HTMLResponse(content=html)
 
 
