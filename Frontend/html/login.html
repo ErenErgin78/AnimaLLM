@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giriş Yap - Duygu Chatbot</title>
+    <!-- CSS Modülleri -->
+    <link rel="stylesheet" href="/static/css/themes.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/matrix.css">
+    <link rel="stylesheet" href="/static/css/auth.css">
+    
+    <!-- JavaScript Modülleri -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/matrix.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/app.js" defer></script>
+    <script src="/static/js/auth.js" defer></script>
+</head>
+<body>
+    <!-- Matrix rain canvas - arka planda akan karakterler -->
+    <canvas id="matrix-canvas"></canvas>
+
+    <!-- Sol alt aksiyon butonları -->
+    <div class="bottom-left-actions">
+        <button class="action-btn" onclick="toggleTheme()">🌗 Tema</button>
+        <button class="action-btn" onclick="toggleMatrix()">🧪 Matrix</button>
+    </div>
+    
+    <!-- Ana container - giriş formu -->
+    <div class="auth-container">
+        <h1>Giriş Yap</h1>
+        
+        <form id="login-form" class="auth-form" onsubmit="handleLogin(event); return false;">
+            <div>
+                <input 
+                    type="email" 
+                    id="email" 
+                    placeholder="E-posta adresi" 
+                    required
+                    autocomplete="email"
+                >
+                <div id="email-error" class="auth-error"></div>
+            </div>
+            
+            <div class="password-input-wrapper">
+                <input 
+                    type="password" 
+                    id="password" 
+                    placeholder="Şifre" 
+                    required
+                    autocomplete="current-password"
+                >
+                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password')" aria-label="Şifreyi göster">
+                    <svg class="eye-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                    </svg>
+                </button>
+                <div id="password-error" class="auth-error"></div>
+            </div>
+            
+            <div id="login-error" class="auth-error"></div>
+            <div id="login-success" class="auth-success"></div>
+            
+            <button type="submit" id="login-btn">Giriş Yap</button>
+        </form>
+        
+        <div class="auth-links">
+            Hesabınız yok mu? <a href="/register.html">Kayıt ol</a>
+        </div>
+    </div>
+</body>
+</html>
+

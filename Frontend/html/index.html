@@ -26,8 +26,22 @@
     <!-- Matrix rain canvas - arka planda akan karakterler -->
     <canvas id="matrix-canvas"></canvas>
 
-    <!-- Sağ üst aksiyon butonları (container dışı, tüm sayfa üzerinde) -->
-    <div class="top-actions">
+    <!-- Sağ üst kullanıcı butonları -->
+    <div class="top-right-actions" id="user-actions">
+        <!-- Giriş yapılmamışsa -->
+        <div id="auth-buttons" style="display: none;">
+            <a href="/login.html" class="action-btn">Giriş</a>
+            <a href="/register.html" class="action-btn">Kayıt</a>
+        </div>
+        <!-- Giriş yapılmışsa -->
+        <div id="user-info" style="display: none;">
+            <span id="user-display" class="user-email"></span>
+            <button class="action-btn" onclick="handleLogout()">🚪 Çıkış</button>
+        </div>
+    </div>
+    
+    <!-- Sol alt aksiyon butonları -->
+    <div class="bottom-left-actions">
         <button class="action-btn" onclick="toggleTheme()">🌗 Tema</button>
         <button class="action-btn" onclick="toggleMatrix()">🧪 Matrix</button>
         <button class="action-btn" onclick="toggleFlowerMode()">🌸 Flower</button>
