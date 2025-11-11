@@ -36,13 +36,24 @@ def get_current_user(
             )
         
         # Token payload'dan kullanıcı bilgilerini al
-        user_id: int = payload.get("sub")  # JWT standardında "sub" (subject) user_id'yi temsil eder
+        # JWT standardında "sub" (subject) string olarak gelir, integer'a çevir
+        user_id_str: str = payload.get("sub")
         user_email: str = payload.get("email")
         
-        if user_id is None or user_email is None:
+        if user_id_str is None or user_email is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token içeriği geçersiz",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # String'den integer'a çevir
+        try:
+            user_id: int = int(user_id_str)
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token içeriği geçersiz (user_id)",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         

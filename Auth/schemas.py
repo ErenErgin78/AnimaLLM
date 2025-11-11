@@ -5,7 +5,7 @@ Kullanıcı giriş, kayıt ve yanıt şemalarını tanımlar
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 import re
 
 
@@ -197,3 +197,117 @@ class TokenResponse(BaseModel):
     token_type: str = Field(default="bearer", description="Token tipi")
     user: UserResponse = Field(..., description="Kullanıcı bilgileri")
 
+
+class ChatHistoryCreate(BaseModel):
+    """
+    Sohbet geçmişi oluşturma şeması - yeni sohbet kaydı için
+    
+    Attributes:
+        user_message: Kullanıcı mesajı
+        bot_response: Bot yanıtı
+        flow_type: Akış tipi (RAG, ANIMAL, EMOTION, STATS, HELP)
+    """
+    
+    user_message: str = Field(..., min_length=1, description="Kullanıcı mesajı")
+    bot_response: str = Field(..., min_length=1, description="Bot yanıtı")
+    flow_type: Optional[str] = Field(None, max_length=20, description="Akış tipi")
+
+
+class ChatHistoryResponse(BaseModel):
+    """
+    Sohbet mesajı yanıt şeması - API response için
+    
+    Attributes:
+        id: Mesaj ID'si
+        conversation_id: Conversation ID'si
+        user_message: Kullanıcı mesajı
+        bot_response: Bot yanıtı
+        flow_type: Akış tipi
+        created_at: Mesaj oluşturulma tarihi
+    """
+    
+    id: int = Field(..., description="Mesaj ID'si")
+    conversation_id: int = Field(..., description="Conversation ID'si")
+    user_message: str = Field(..., description="Kullanıcı mesajı")
+    bot_response: str = Field(..., description="Bot yanıtı")
+    flow_type: Optional[str] = Field(None, description="Akış tipi")
+    created_at: datetime = Field(..., description="Mesaj oluşturulma tarihi")
+    
+    class Config:
+        """Pydantic config - ORM mode aktif"""
+        from_attributes = True
+
+
+class ChatHistoryListResponse(BaseModel):
+    """
+    Sohbet geçmişi liste yanıt şeması - pagination ile
+    
+    Attributes:
+        total: Toplam kayıt sayısı
+        limit: Sayfa başına kayıt sayısı
+        offset: Atlanacak kayıt sayısı
+        items: Sohbet geçmişi kayıtları listesi
+    """
+    
+    total: int = Field(..., description="Toplam kayıt sayısı")
+    limit: int = Field(..., description="Sayfa başına kayıt sayısı")
+    offset: int = Field(..., description="Atlanacak kayıt sayısı")
+    items: List[ChatHistoryResponse] = Field(..., description="Sohbet geçmişi kayıtları")
+
+
+class ConversationCreate(BaseModel):
+    """
+    Conversation oluşturma şeması
+    
+    Attributes:
+        title: Sohbet başlığı (opsiyonel, ilk mesajdan otomatik oluşturulabilir)
+    """
+    
+    title: Optional[str] = Field(None, max_length=200, description="Sohbet başlığı")
+
+
+class ConversationResponse(BaseModel):
+    """
+    Conversation yanıt şeması
+    
+    Attributes:
+        id: Conversation ID'si
+        user_id: Kullanıcı ID'si
+        title: Sohbet başlığı
+        created_at: Oluşturulma tarihi
+        updated_at: Son güncelleme tarihi
+    """
+    
+    id: int = Field(..., description="Conversation ID'si")
+    user_id: int = Field(..., description="Kullanıcı ID'si")
+    title: str = Field(..., description="Sohbet başlığı")
+    created_at: datetime = Field(..., description="Oluşturulma tarihi")
+    updated_at: datetime = Field(..., description="Son güncelleme tarihi")
+    
+    class Config:
+        """Pydantic config - ORM mode aktif"""
+        from_attributes = True
+
+
+class ConversationListResponse(BaseModel):
+    """
+    Conversation liste yanıt şeması
+    
+    Attributes:
+        items: Conversation listesi
+    """
+    
+    items: List[ConversationResponse] = Field(..., description="Conversation listesi")
+
+
+class ConversationMessagesResponse(BaseModel):
+    """
+    Conversation mesajları yanıt şeması
+    
+    Attributes:
+        conversation: Conversation bilgileri
+        messages: Mesaj listesi
+    """
+    
+    conversation: ConversationResponse = Field(..., description="Conversation bilgileri")
+    messages: List[ChatHistoryResponse] = Field(..., description="Mesaj listesi")
