@@ -74,6 +74,12 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
 - **Global Memory**: Tüm chain'ler aynı memory instance'ını paylaşır
 - **Context Preservation**: Önceki konuşmaların bağlamı korunuyor
 
+### 🔐 **Auth Sistemi (Kullanıcı Yönetimi)**
+- **SQLite Veritabanı**: Kullanıcı kayıtları, conversation'lar ve mesaj geçmişi SQLite'da saklanır
+- **JWT Token Authentication**: Güvenli giriş/çıkış sistemi ve token tabanlı yetkilendirme
+- **Conversation Yönetimi**: ChatGPT tarzı sohbet oturumları - her kullanıcı kendi conversation'larını yönetebilir
+- **Modüler Yapı**: SQLAlchemy ORM, Pydantic schemas, FastAPI dependencies ile temiz mimari
+
 ---
 
 ## 🚀 Özellikler
@@ -108,6 +114,12 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
 - API işlem sürelerini kısaltır
 - Konsola özet çıktısı loglar
 
+### 💾 **SQLite Sohbet Geçmişi**
+- **Conversation Tabanlı Sistem**: ChatGPT tarzı sohbet oturumları - her conversation bağımsız mesaj grubu
+- **Kalıcı Veri Depolama**: Tüm mesajlar SQLite veritabanında saklanır (Auth/Database/users.db)
+- **Kullanıcı Bazlı Geçmiş**: Her kullanıcı sadece kendi conversation'larını görür ve yönetir
+- **Frontend Entegrasyonu**: Sağdan açılan panel ile conversation listesi, mesaj yükleme ve yeni sohbet başlatma
+
 ### 🎨 **Gelişmiş UI/UX**
 - Sürüklenebilir düğümler ve halat animasyonları
 - Matrix arkaplan efekti
@@ -130,11 +142,17 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
 pip install -r requirements.txt
 ```
 
-### 3. API Anahtarı
+### 3. Ortam Değişkenleri (.env)
 `.env` dosyasını oluşturun:
 ```
 OPENAI_API_KEY=sk-your-api-key-here
+GEMINI_API_KEY=sk-your-api-key-here
+JWT_SECRET_KEY=your-secret-key-here-minimum-32-characters-long
 ```
+
+**Önemli**: 
+- `JWT_SECRET_KEY` en az 32 karakter uzunluğunda güçlü bir rastgele string olmalıdır (güvenlik için)
+- Örnek: Terminalde `python -c "import secrets; print(secrets.token_urlsafe(32))"` komutu ile güvenli bir key oluşturabilirsiniz
 
 ### 4. PDF Dosyaları
 `PDFs/` klasörüne PDF dosyalarınızı yerleştirin:
@@ -222,18 +240,31 @@ Tarayıcınızda: `http://localhost:8000/`
 │   ├── emotion_system.py   # Duygu sistemi (LoRA + LLM)
 │   ├── rag_service.py      # RAG servisi
 │   └── statistic_system.py # İstatistik sistemi
+├── Auth/                   # Kullanıcı yönetimi ve authentication
+│   ├── database.py         # SQLite veritabanı bağlantısı
+│   ├── models.py           # SQLAlchemy ORM modelleri (User, Conversation, ChatHistory)
+│   ├── schemas.py          # Pydantic request/response şemaları
+│   ├── routes.py           # FastAPI authentication ve conversation endpoint'leri
+│   ├── auth_service.py     # Kullanıcı kayıt/giriş işlemleri
+│   ├── conversation_service.py # Conversation CRUD işlemleri
+│   ├── dependencies.py     # JWT token doğrulama dependencies
+│   └── Database/           # SQLite veritabanı dosyası
+│       └── users.db        # Kullanıcılar, conversation'lar ve mesajlar
 ├── Frontend/               # Tüm frontend varlıkları
-│   ├── html/index.html     # Web sayfası (UI)
-│   ├── css/                # Stil dosyaları (themes.css, base.css, nodes.css ...)
-│   └── js/                 # JS modülleri (app.js, nodes.js, chat.js ...)
+│   ├── html/               # HTML sayfaları
+│   │   ├── index.html      # Ana sayfa (chatbot UI)
+│   │   ├── login.html      # Giriş sayfası
+│   │   └── register.html   # Kayıt sayfası
+│   ├── css/                # Stil dosyaları (themes.css, base.css, nodes.css, chat.css ...)
+│   └── js/                 # JS modülleri (app.js, nodes.js, chat.js, history.js, auth.js ...)
 ├── data/                   # Kalıcı veriler (proje kökü)
 │   ├── mood_emojis.json    # Duygu emojileri
-│   ├── chat_history.txt    # Konuşma geçmişi kayıtları
+│   ├── chat_history.txt    # Konuşma geçmişi kayıtları (eski sistem)
 │   └── mood_counter.txt    # Zaman damgalı duygu kayıtları
-└── PDFs/                   # RAG için PDF kaynakları
-    ├── cat_care.pdf        # Kedi bakımı
-    ├── parrot_care.pdf     # Papağan bakımı
-    └── rabbit_care.pdf     # Tavşan bakımı
+├── PDFs/                   # RAG için PDF kaynakları
+│   ├── cat_care.pdf        # Kedi bakımı
+│   ├── parrot_care.pdf     # Papağan bakımı
+│   └── rabbit_care.pdf     # Tavşan bakımı
 └── Lora/
     ├── Code/               # LoRA eğitim/güncelleme betikleri (opsiyonel)
     ├── Data/               # LoRA eğitim verileri (örn. final.json)
@@ -244,6 +275,7 @@ Tarayıcınızda: `http://localhost:8000/`
 Önemli notlar:
 - LoRA: `Lora/Model/main/` altında adapter dosyaları bulunur ve `Tools/emotion_system.py` tarafından proje kökünden yüklenir.
 - Static servis: `main.py` HTML'i `Frontend/html/index.html`'den, CSS/JS'yi `Frontend/` altından `/static/...` yolu ile sunar ve otomatik cache-busting uygular.
+- Auth sistemi: `Auth/Database/users.db` SQLite veritabanı otomatik oluşturulur. Conversation'lar ve mesajlar bu veritabanında saklanır. JWT token'lar için `.env` dosyasında `JWT_SECRET_KEY` tanımlanmalıdır.
 
 ---
 
@@ -276,5 +308,11 @@ Tarayıcınızda: `http://localhost:8000/`
 - **Küçük Node'ler**: Başlangıçta kapalı; tıklayınca açılır
 - **Tek Hat**: Büyük node ile chat arasında tek ip
 - **Renkli Parlama**: RAG=sarı, API=mavi, PLAIN=yeşil
+
+### 📱 **Responsive Tasarım**
+- **Mobil Uyumlu**: Tüm sayfalar (ana sayfa, giriş, kayıt) mobil cihazlarda optimize edilmiş görünüm
+- **Esnek Layout**: CSS Grid ve Flexbox ile tüm ekran boyutlarına uyumlu arayüz
+- **Touch-Friendly**: Mobil cihazlarda dokunmatik etkileşimler için optimize edilmiş buton ve input alanları
+- **Adaptive Panels**: Sohbet geçmişi paneli ve diğer UI elementleri ekran boyutuna göre otomatik ayarlanır
 
 ---
