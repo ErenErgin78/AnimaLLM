@@ -152,7 +152,7 @@ JWT_SECRET_KEY=your-secret-key-here-minimum-32-characters-long
 
 **Önemli**: 
 - `JWT_SECRET_KEY` en az 32 karakter uzunluğunda güçlü bir rastgele string olmalıdır (güvenlik için)
-- Örnek: Terminalde `python -c "import secrets; print(secrets.token_urlsafe(32))"` komutu ile güvenli bir key oluşturabilirsiniz
+- Örnek: `openssl rand -hex 32` komutu ile güvenli bir key oluşturabilirsiniz
 
 ### 4. PDF Dosyaları
 `PDFs/` klasörüne PDF dosyalarınızı yerleştirin:

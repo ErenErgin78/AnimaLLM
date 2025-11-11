@@ -21,7 +21,7 @@ load_dotenv()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT ayarları - environment variable'dan alınır
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-this-in-production")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = "HS256"  # HMAC SHA-256 algoritması
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 gün (dakika cinsinden)
 

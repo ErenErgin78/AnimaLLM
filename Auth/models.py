@@ -154,3 +154,33 @@ class ChatHistory(Base):
         """Sohbet mesajı objesinin string temsili - debug için"""
         return f"<ChatHistory(id={self.id}, conversation_id={self.conversation_id}, flow_type='{self.flow_type}', created_at='{self.created_at}')>"
 
+
+class EmotionLog(Base):
+    """
+    Duygu kayıt modeli - kullanıcı bazlı duygu geçmişini saklar
+    
+    Attributes:
+        id: Duygu kaydı benzersiz ID'si (primary key, auto-increment)
+        user_id: Kullanıcı ID'si (foreign key, User tablosuna referans)
+        mood: Kaydedilen duygu (Mutlu, Üzgün, vb.)
+        created_at: Duygu kaydının oluşturulma tarihi (otomatik, default: şu anki zaman)
+    """
+    
+    __tablename__ = "emotion_logs"  # Tablo adı
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    mood = Column(String(50), nullable=False, index=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True
+    )
+    
+    user = relationship("User", backref="emotion_logs")
+    
+    def __repr__(self):
+        """Duygu log kaydının string temsili - debug için"""
+        return f"<EmotionLog(id={self.id}, user_id={self.user_id}, mood='{self.mood}', created_at='{self.created_at}')>"
+

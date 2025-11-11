@@ -55,7 +55,7 @@ def init_db():
     """
     try:
         # Tüm modelleri import et (circular import'u önlemek için)
-        from Auth.models import User, Conversation, ChatHistory  # noqa: F401
+        from Auth.models import User, Conversation, ChatHistory, EmotionLog  # noqa: F401
         
         # Veritabanı migration kontrolü
         db_file = DATABASE_DIR / "users.db"
