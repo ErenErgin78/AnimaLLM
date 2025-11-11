@@ -71,6 +71,11 @@ function checkUserStatus() {
         if (authButtons) authButtons.style.display = 'flex';
         if (userInfo) userInfo.style.display = 'none';
     }
+    
+    // Sohbet geçmişi butonunu güncelle (varsa)
+    if (typeof updateHistoryButtonVisibility === 'function') {
+        updateHistoryButtonVisibility();
+    }
 }
 
 // Çıkış yap
@@ -125,6 +130,11 @@ window.addEventListener('load', () => {
     if (typeof checkUserStatus === 'function') {
         checkUserStatus();
     }
+    
+    // Sohbet geçmişi butonunu güncelle (varsa)
+    if (typeof updateHistoryButtonVisibility === 'function') {
+        updateHistoryButtonVisibility();
+    }
 });
 
 // Sayfa yüklendiğinde kullanıcı durumunu kontrol et
@@ -132,6 +142,11 @@ window.addEventListener('DOMContentLoaded', () => {
     // Kullanıcı durumunu kontrol et (varsa)
     if (typeof checkUserStatus === 'function') {
         checkUserStatus();
+    }
+    
+    // Sohbet geçmişi butonunu güncelle (varsa)
+    if (typeof updateHistoryButtonVisibility === 'function') {
+        updateHistoryButtonVisibility();
     }
     
     // Matrix'i erken başlat (canvas hazır olduğunda)

@@ -95,12 +95,25 @@ async function sendMessage() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 saniye timeout
         
+        // Token'ı al (varsa)
+        const token = localStorage.getItem('access_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        // Aktif conversation ID'sini al (varsa)
+        const conversationId = window.currentConversationId || null;
+        
         let resp;
         try {
             resp = await fetch('/chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message }),
+                headers: headers,
+                body: JSON.stringify({ 
+                    message,
+                    conversation_id: conversationId
+                }),
                 signal: controller.signal
             });
         } catch (fetchError) {
@@ -122,6 +135,11 @@ async function sendMessage() {
         
         const data = await resp.json();
         console.log('[CHAT] Response data:', data);
+        
+        // Conversation ID'sini sakla (yeni conversation oluşturulduysa veya mevcut conversation kullanıldıysa)
+        if (data.conversation_id) {
+            window.currentConversationId = data.conversation_id;
+        }
         
         // İstatistik sayacını güncelle
         if (data.stats) {

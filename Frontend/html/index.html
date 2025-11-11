@@ -20,6 +20,7 @@
     <script src="/static/js/lightbox.js"></script>
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/nodes.js"></script>
+    <script src="/static/js/history.js"></script>
     <script src="/static/js/app.js" defer></script>
 </head>
 <body>
@@ -45,6 +46,22 @@
         <button class="action-btn" onclick="toggleTheme()">🌗 Tema</button>
         <button class="action-btn" onclick="toggleMatrix()">🧪 Matrix</button>
         <button class="action-btn" onclick="toggleFlowerMode()">🌸 Flower</button>
+        <button class="action-btn" id="history-toggle-btn" onclick="toggleChatHistory()" style="display: none;">📜 Geçmiş</button>
+    </div>
+    
+    <!-- Sohbet Geçmişi Paneli - Açılır/Kapanır -->
+    <div id="chat-history-panel" class="chat-history-panel hidden">
+        <div class="chat-history-header">
+            <h3>📜 Sohbet Geçmişi</h3>
+            <button class="chat-history-close" onclick="toggleChatHistory()">✕</button>
+        </div>
+        <div id="chat-history-content" class="chat-history-content">
+            <div class="chat-history-loading">Yükleniyor...</div>
+        </div>
+        <div class="chat-history-footer">
+            <button class="chat-history-new" onclick="startNewConversation(); toggleChatHistory();">➕ Yeni Sohbet</button>
+            <button class="chat-history-clear" onclick="clearChatHistory()">🗑️ Tümünü Temizle</button>
+        </div>
     </div>
     
     <!-- SVG wires - node'lar arası bağlantı çizgileri -->

@@ -12,7 +12,7 @@ import os
 import re
 import html
 from typing import Any, Dict
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -22,7 +22,6 @@ from dotenv import load_dotenv
 from langchain_openai import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.schema import BaseOutputParser
-from langchain.memory import ConversationSummaryBufferMemory
 
 # Sistem modüllerini import et (Tools klasöründen)
 from Tools.emotion_system import EmotionChatbot
@@ -32,7 +31,12 @@ from Tools.rag_service import rag_service
 
 # Auth modüllerini import et
 from Auth.routes import router as auth_router
-from Auth.database import init_db
+from Auth.database import init_db, get_db
+from Auth.conversation_service import (
+    create_conversation, get_conversation_by_id,
+    add_message_to_conversation, update_conversation_title
+)
+from Auth.models import User
 
 load_dotenv()
 
@@ -97,21 +101,133 @@ def get_llm():
 
 llm = get_llm()
 
-# =============================================================================
-# CONVERSATIONSUMMARYBUFFERMEMORY - GLOBAL MEMORY SİSTEMİ
-# =============================================================================
-# Hibrit yaklaşım: uzun konuşmaları özetler, son mesajları hatırlar
-# Token limiti ile maliyet kontrolü sağlar
-# Tüm chain'ler bu memory sistemi ile konuşma geçmişini paylaşır
-memory = ConversationSummaryBufferMemory(
-    llm=llm,
-    max_token_limit=200,  # 200 token limit - maliyet kontrolü için
-    memory_key="chat_history",  # Memory anahtarı - chain'lerde otomatik kullanılır
-    return_messages=True  # Mesaj formatında döndür - LangChain uyumluluğu için
-)
-
 # Global chatbot instance
 chatbot_instance: EmotionChatbot | None = None
+
+# =============================================================================
+# CONVERSATION HELPER - ChatGPT Tarzı Sohbet Oturumu Yönetimi
+# =============================================================================
+def save_message_to_conversation(
+    user_id: int | None,
+    conversation_id: int | None,
+    user_message: str,
+    bot_response: str,
+    flow_type: str | None = None
+) -> int | None:
+    """
+    Mesajı conversation'a kaydeder (yeni conversation oluşturur veya mevcut conversation'a ekler)
+    
+    Args:
+        user_id: Kullanıcı ID'si (None ise kaydetme)
+        conversation_id: Conversation ID'si (None ise yeni conversation oluştur)
+        user_message: Kullanıcı mesajı
+        bot_response: Bot yanıtı
+        flow_type: Akış tipi (RAG, ANIMAL, EMOTION, STATS, HELP)
+    
+    Returns:
+        int | None: Conversation ID'si veya None
+    """
+    if user_id is None:
+        # Kullanıcı giriş yapmamış, kaydetme
+        return None
+    
+    try:
+        # Veritabanı session'ı al
+        db = next(get_db())
+        try:
+            # Conversation ID yoksa yeni conversation oluştur
+            if conversation_id is None:
+                # İlk mesajdan başlık oluştur (maksimum 50 karakter)
+                title = user_message[:50].strip()
+                if not title:
+                    title = "Yeni Sohbet"
+                
+                # Yeni conversation oluştur
+                new_conversation = create_conversation(
+                    db=db,
+                    user_id=user_id,
+                    title=title
+                )
+                conversation_id = new_conversation.id
+                print(f"[CONVERSATION] Yeni conversation oluşturuldu: conversation_id={conversation_id}, title='{title}'")
+            else:
+                # Mevcut conversation'ı kontrol et
+                existing_conv = get_conversation_by_id(db, conversation_id, user_id)
+                if not existing_conv:
+                    # Conversation bulunamadı, yeni oluştur
+                    title = user_message[:50].strip()
+                    if not title:
+                        title = "Yeni Sohbet"
+                    new_conversation = create_conversation(
+                        db=db,
+                        user_id=user_id,
+                        title=title
+                    )
+                    conversation_id = new_conversation.id
+                    print(f"[CONVERSATION] Conversation bulunamadı, yeni oluşturuldu: conversation_id={conversation_id}")
+            
+            # Conversation'a mesaj ekle
+            add_message_to_conversation(
+                db=db,
+                conversation_id=conversation_id,
+                user_id=user_id,
+                user_message=user_message,
+                bot_response=bot_response,
+                flow_type=flow_type
+            )
+            print(f"[CONVERSATION] Mesaj eklendi: conversation_id={conversation_id}, flow_type={flow_type}")
+            
+            return conversation_id
+        finally:
+            # Session'ı kapat
+            db.close()
+    except Exception as e:
+        # Hata durumunda sessizce devam et (sohbet akışını bozmamak için)
+        print(f"[CONVERSATION ERROR] Mesaj kaydedilemedi: {e}")
+        return None
+
+
+def get_current_user_id_optional(authorization: str | None = None) -> int | None:
+    """
+    JWT token'dan kullanıcı ID'sini alır (opsiyonel - token yoksa None döner)
+    
+    Args:
+        authorization: Authorization header değeri (Bearer token)
+    
+    Returns:
+        int | None: Kullanıcı ID'si veya None
+    """
+    if not authorization:
+        return None
+    
+    try:
+        # Bearer token'ı çıkar
+        if not authorization.startswith("Bearer "):
+            return None
+        
+        token = authorization.replace("Bearer ", "").strip()
+        if not token:
+            return None
+        
+        # Token'ı doğrula
+        from Auth.auth_service import verify_token
+        payload = verify_token(token)
+        if payload is None:
+            return None
+        
+        # User ID'yi al - JWT standardına göre string olarak gelir
+        user_id_str = payload.get("sub")
+        if user_id_str is None:
+            return None
+        
+        # String'den integer'a çevir
+        try:
+            return int(user_id_str)
+        except (ValueError, TypeError):
+            return None
+    except Exception:
+        # Hata durumunda None döndür
+        return None
 
 # =============================================================================
 # ÖZETLEYİCİ (SUMMARIZER) - Uzun kullanıcı mesajlarını kısaltmak için
@@ -302,8 +418,7 @@ def _estimate_tokens(text: str) -> int:
 # =============================================================================
 
 def create_flow_decision_chain():
-    """Akış kararı chain'i oluşturur - ConversationSummaryBufferMemory ile"""
-    # Memory sistemi ile akış kararı - önceki konuşma bağlamı otomatik eklenir
+    """Akış kararı chain'i oluşturur"""
     flow_prompt = PromptTemplate(
         input_variables=["input"],
         template="""Kullanıcının mesajını analiz et ve şu akışlardan birini seç: ANIMAL, RAG, EMOTION, STATS, HELP.
@@ -405,9 +520,7 @@ def create_flow_decision_chain():
 
 
 def create_rag_chain():
-    """RAG chain'i oluşturur - ConversationSummaryBufferMemory ile"""
-    # Memory ile kullanırken sadece tek input variable kullan - chat_history otomatik eklenir
-    # Context bilgisi prompt'a dahil edilir, memory sistemi konuşma geçmişini yönetir
+    """RAG chain'i oluşturur"""
     rag_prompt = PromptTemplate(
         input_variables=["input"],
         template="""Sen bir hayvan bakımı bilgi asistanısın. Verilen kullanıcı mesajını kullanarak kullanıcının sorusunu yanıtla. 
@@ -482,11 +595,10 @@ def create_rag_chain():
 
 
 def create_animal_chain():
-    """Animal chain'i oluşturur - API çağrısı yapar - ConversationSummaryBufferMemory ile"""
-    def animal_processor(user_message: str) -> Dict[str, Any]:
-        """Hayvan API'sini çağırır ve sonucu döndürür - memory sistemi ile timeout handling"""
+    """Animal chain'i oluşturur - API çağrısı yapar"""
+    def animal_processor(user_message: str, user_id: int | None = None) -> Dict[str, Any]:
+        """Hayvan API'sini çağırır ve sonucu döndürür"""
         # Hayvan API'leri için timeout ve hata yönetimi
-        # Memory sistemi ile konuşma geçmişi otomatik olarak yönetiliyor
         try:
             print("[ANIMAL CHAIN] Hayvan API'si çağrılıyor...")
             # OpenAI client oluştur - route_animals client bekliyor
@@ -507,21 +619,11 @@ def create_animal_chain():
                 else:
                     out["response"] = animal_result.get("text", "")
                 
-                # Memory'ye animal yanıtını kaydet
-                memory.save_context(
-                    {"input": user_message},
-                    {"output": out["response"]}
-                )
-                
                 print(f"[ANIMAL CHAIN] Başarılı: {animal}")
                 return out
             
-            # Hayvan bulunamadı durumu için de memory'ye kaydet
+            # Hayvan bulunamadı durumu
             error_response = "Hayvan bulunamadı."
-            memory.save_context(
-                {"input": user_message},
-                {"output": error_response}
-            )
             print("[ANIMAL CHAIN] Hayvan bulunamadı")
             return {"response": error_response}
             
@@ -529,21 +631,16 @@ def create_animal_chain():
             print(f"[ANIMAL CHAIN] Hata: {e}")
             # Timeout veya API hatası durumunda fallback yanıt
             error_response = "Hayvan API'si şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
-            memory.save_context(
-                {"input": user_message},
-                {"output": error_response}
-            )
             return {"response": error_response}
     
     return animal_processor
 
 
 def create_emotion_chain():
-    """Emotion chain'i oluşturur - ConversationSummaryBufferMemory ile"""
-    def emotion_processor(user_message: str) -> Dict[str, Any]:
-        """Duygu analizi yapar - memory sistemi ile"""
+    """Emotion chain'i oluşturur"""
+    def emotion_processor(user_message: str, user_id: int | None = None) -> Dict[str, Any]:
+        """Duygu analizi yapar"""
         # Emotion sistemi için OpenAI client oluşturma
-        # Memory sistemi ile konuşma geçmişi otomatik olarak yönetiliyor
         global chatbot_instance
         if chatbot_instance is None:
             # Fallback mekanizması ile client oluştur
@@ -563,15 +660,7 @@ def create_emotion_chain():
                 chatbot_instance = EmotionChatbot()  # client=None, Gemini kullanacak
                 print("[EMOTION] Gemini API kullanılıyor")
         
-        # Memory sistemi ile önceki konuşma geçmişi otomatik olarak yönetiliyor
-        
         result = chatbot_instance.chat(user_message)
-        
-        # Memory'ye yeni konuşmayı kaydet
-        memory.save_context(
-            {"input": user_message},
-            {"output": result.get("response", "")}
-        )
         
         # Yeni emotion_system formatına uygun response döndür
         # Format: {"response": lora_response, "emoji": emoji, "mood": mood, "stats": stats}
@@ -595,15 +684,12 @@ def create_stats_chain():
     """Stats chain'i oluşturur - data/ dosyalarından hesaplar"""
     stats_system = StatisticSystem()
 
-    def stats_processor(user_message: str) -> Dict[str, Any]:
+    def stats_processor(user_message: str, user_id: int | None = None) -> Dict[str, Any]:
         try:
             result = stats_system.answer(user_message)
-            # Memory'ye kaydet
-            memory.save_context({"input": user_message}, {"output": result.get("response", "")})
             return result
         except Exception as e:
             err = f"İstatistik sistemi hatası: {e}"
-            memory.save_context({"input": user_message}, {"output": err})
             return {"response": err}
 
     return stats_processor
@@ -622,18 +708,17 @@ def create_main_processing_chain():
     emotion_processor = create_emotion_chain()
     stats_processor = create_stats_chain()
     
-    def process_message(user_message: str) -> Dict[str, Any]:
-        """Ana mesaj işleme fonksiyonu - ConversationSummaryBufferMemory ile"""
+    def process_message(user_message: str, user_id: int | None = None) -> Dict[str, Any]:
+        """Ana mesaj işleme fonksiyonu - SQLite tabanlı sohbet geçmişi ile"""
         try:
             print("[CHAIN SYSTEM] AŞAMA 1: Akış kararı alınıyor...")
-            
-            # Memory sistemi aktif - ConversationSummaryBufferMemory ile konuşma geçmişi yönetiliyor
             
             # AŞAMA 1: Akış kararı
             flow_decision = flow_decision_chain({"input": user_message})
             print(f"[CHAIN SYSTEM] Akış kararı: {flow_decision}")
             
             # AŞAMA 2: Seçilen akışa göre işleme
+            result = None
             if flow_decision == "RAG":
                 print("[CHAIN SYSTEM] AŞAMA 2: RAG akışı çalışıyor...")
                 rag_result = _process_rag_flow(user_message, rag_chain)
@@ -641,36 +726,38 @@ def create_main_processing_chain():
                     print("[CHAIN SYSTEM] RAG sonucu None, HELP akışına yönlendiriliyor...")
                     help_result = _process_help_flow(user_message)
                     help_result["flow_type"] = "HELP"
-                    return help_result
-                rag_result["flow_type"] = "RAG"
-                return rag_result
+                    result = help_result
+                else:
+                    rag_result["flow_type"] = "RAG"
+                    result = rag_result
             elif flow_decision == "ANIMAL":
                 print("[CHAIN SYSTEM] AŞAMA 2: Animal akışı çalışıyor...")
-                animal_result = animal_processor(user_message)
+                animal_result = animal_processor(user_message, user_id)
                 animal_result["flow_type"] = "ANIMAL"
-                return animal_result
+                result = animal_result
             elif flow_decision == "EMOTION":
                 print("[CHAIN SYSTEM] AŞAMA 2: Emotion akışı çalışıyor...")
-                emotion_result = emotion_processor(user_message)
+                emotion_result = emotion_processor(user_message, user_id)
                 emotion_result["flow_type"] = "EMOTION"
-                return emotion_result
+                result = emotion_result
             elif flow_decision == "STATS":
                 print("[CHAIN SYSTEM] AŞAMA 2: Stats akışı çalışıyor...")
-                stats_result = stats_processor(user_message)
+                stats_result = stats_processor(user_message, user_id)
                 stats_result["flow_type"] = "STATS"
-                return stats_result
+                result = stats_result
             elif flow_decision == "HELP":
                 print("[CHAIN SYSTEM] AŞAMA 2: Help akışı çalışıyor...")
-                result = _process_help_flow(user_message)
-                result["flow_type"] = "HELP"
-                print(f"[CHAIN SYSTEM] Help result: {result}")
-                return result
+                help_result = _process_help_flow(user_message)
+                help_result["flow_type"] = "HELP"
+                result = help_result
             else:
                 print("[CHAIN SYSTEM] Fallback: Help akışı çalışıyor...")
-                result = _process_help_flow(user_message)
-                result["flow_type"] = "HELP"
-                print(f"[CHAIN SYSTEM] Fallback result: {result}")
-                return result
+                help_result = _process_help_flow(user_message)
+                help_result["flow_type"] = "HELP"
+                result = help_result
+            
+            # Conversation kaydı /chat endpoint'inde yapılıyor, burada yapmıyoruz
+            return result
                 
         except Exception as e:
             print(f"[CHAIN SYSTEM] Hata: {e}")
@@ -713,12 +800,6 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
         combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
         result = rag_chain({"input": combined_input})
         
-        # Memory'ye RAG yanıtını kaydet
-        memory.save_context(
-            {"input": user_message},
-            {"output": result if isinstance(result, str) else str(result)}
-        )
-        
         # Pick first known source for UI hint
         lit = None
         for s in sources:
@@ -752,12 +833,6 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
     print(f"[RAG DEBUG] Context uzunluğu: {len(context)} karakter")
     result = rag_chain({"input": combined_input})
     
-    # Memory'ye RAG yanıtını kaydet
-    memory.save_context(
-        {"input": user_message},
-        {"output": result if isinstance(result, str) else str(result)}
-    )
-    
     ui = RAG_SOURCES.get(source)
     return {
         "rag": True,
@@ -784,12 +859,6 @@ def _process_help_flow(user_message: str) -> Dict[str, Any]:
 • "Bugün çok mutluyum", "Üzgün hissediyorum" gibi mesajlar
 
 🎯 **KULLANIM**: Ekranda gördüğünüz kutucukları kullanarak veya yukarıdaki örnekler gibi mesajlar göndererek bu chatbot'u kullanabilirsiniz!"""
-    
-    # Memory'ye help yanıtını kaydet
-    memory.save_context(
-        {"input": user_message},
-        {"output": help_message}
-    )
     
     return {
         "help": True,
@@ -853,9 +922,23 @@ def login_page() -> HTMLResponse:
 
 
 @app.post("/chat")
-def chat(payload: Dict[str, Any]) -> Dict[str, Any]:
+def chat(
+    payload: Dict[str, Any],
+    authorization: str | None = Header(None, alias="Authorization")
+) -> Dict[str, Any]:
     """Ana chat endpoint'i - CHAIN SYSTEM ile akış yönlendirmesi yapar"""
     user_message = str(payload.get("message", "")).strip()
+    
+    # Conversation ID'sini al (opsiyonel - mevcut conversation'a mesaj eklemek için)
+    conversation_id = payload.get("conversation_id")
+    if conversation_id is not None:
+        try:
+            conversation_id = int(conversation_id)
+        except (ValueError, TypeError):
+            conversation_id = None
+    
+    # Kullanıcı ID'sini al (opsiyonel - giriş yapılmışsa)
+    user_id = get_current_user_id_optional(authorization)
     
     # Güvenlik kontrolleri
     if not user_message:
@@ -882,7 +965,7 @@ def chat(payload: Dict[str, Any]) -> Dict[str, Any]:
     try:
         # CHAIN SYSTEM ile mesaj işleme
         print(f"[CHAIN SYSTEM] Mesaj işleniyor... Kullanıcı mesajı: {user_message[:100]}...")
-        result = main_chain(user_message)
+        result = main_chain(user_message, user_id)
         
         # Result'u kontrol et ve hata varsa düzelt
         if isinstance(result, dict) and "error" in result:
@@ -895,6 +978,22 @@ def chat(payload: Dict[str, Any]) -> Dict[str, Any]:
             return {"error": "Geçersiz response formatı"}
             
         print(f"[CHAIN SYSTEM] Başarılı response: {result}")
+        
+        # Conversation'a mesaj kaydet (kullanıcı giriş yapmışsa)
+        if user_id and "error" not in result:
+            bot_response = result.get("response", "")
+            flow_type = result.get("flow_type")
+            saved_conversation_id = save_message_to_conversation(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                user_message=user_message,
+                bot_response=bot_response,
+                flow_type=flow_type
+            )
+            # Response'a conversation_id ekle
+            if saved_conversation_id:
+                result["conversation_id"] = saved_conversation_id
+        
         return result
 
     except HTTPException as e:
