@@ -361,8 +361,6 @@ class EmotionChatbot:
             if use_gpu:
                 print(f"[LoRA] Model device: {next(self.lora_model.parameters()).device}")
             
-            print("[LoRA] Model başarıyla yüklendi ve hazır")
-            
         except Exception as e:
             print(f"[ERROR] LoRA model yükleme hatası: {e}")
             import traceback
