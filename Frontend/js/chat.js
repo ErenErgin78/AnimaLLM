@@ -72,7 +72,27 @@ function handleRagResponse(data) {
 }
 
 /**
- * Backend'e mesaj gönderir ve yanıtı işler
+ * Streaming mesajı gösterir ve günceller
+ * @param {string} content - Mesaj içeriği
+ * @param {HTMLElement} messageDiv - Mesaj div elementi
+ */
+function updateStreamingMessage(content, messageDiv) {
+    if (messageDiv) {
+        const pre = messageDiv.querySelector('pre');
+        if (pre) {
+            pre.textContent = content;
+        } else {
+            messageDiv.innerHTML = '<pre>' + escapeHtml(content) + '</pre>';
+        }
+        const chatBox = document.getElementById('chat-box');
+        if (chatBox) {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    }
+}
+
+/**
+ * Backend'e mesaj gönderir ve yanıtı işler (streaming desteği ile)
  */
 async function sendMessage() {
     const input = document.getElementById('user-input');
@@ -91,10 +111,6 @@ async function sendMessage() {
     try {
         console.log('[CHAT] Mesaj gönderiliyor:', message);
         
-        // Backend'e istek gönder (timeout ile)
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 saniye timeout
-        
         // Token'ı al (varsa)
         const token = localStorage.getItem('access_token');
         const headers = { 'Content-Type': 'application/json' };
@@ -105,25 +121,27 @@ async function sendMessage() {
         // Aktif conversation ID'sini al (varsa)
         const conversationId = window.currentConversationId || null;
         
+        // Streaming modunu aktif et (RAG için)
+        const useStreaming = true; // Her zaman streaming kullan
+        
         let resp;
         try {
-            resp = await fetch('/chat', {
+            const url = `/chat?stream=${useStreaming}`;
+            resp = await fetch(url, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify({ 
                     message,
-                    conversation_id: conversationId
-                }),
-                signal: controller.signal
+                    conversation_id: conversationId,
+                    stream: useStreaming
+                })
             });
         } catch (fetchError) {
-            clearTimeout(timeoutId);
             if (fetchError.name === 'AbortError') {
-                throw new Error('İstek zaman aşımına uğradı (60 saniye)');
+                throw new Error('İstek zaman aşımına uğradı');
             }
             throw fetchError;
         }
-        clearTimeout(timeoutId);
         
         console.log('[CHAT] Response alındı, status:', resp.status);
         
@@ -133,6 +151,18 @@ async function sendMessage() {
             throw new Error(`HTTP ${resp.status}: ${errorText}`);
         }
         
+        // Content-Type kontrolü - streaming mi normal mi?
+        const contentType = resp.headers.get('content-type') || '';
+        const isStreaming = contentType.includes('text/event-stream');
+        
+        if (isStreaming) {
+            // Streaming modu
+            console.log('[CHAT] Streaming modu aktif');
+            await handleStreamingResponse(resp);
+            return;
+        }
+        
+        // Normal mod (streaming değil)
         const data = await resp.json();
         console.log('[CHAT] Response data:', data);
         
@@ -267,6 +297,118 @@ async function sendMessage() {
         removeLoadingMessage();
         const errorMsg = e.message || 'Bilinmeyen hata';
         addMessage('Bağlantı hatası: ' + errorMsg, false);
+        setFaceFromText('😵');
+        disableInput(false);
+    }
+}
+
+/**
+ * Streaming response'u işler
+ * @param {Response} resp - Fetch response objesi
+ */
+async function handleStreamingResponse(resp) {
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let streamingMessageDiv = null;
+    let fullContent = '';
+    let metadata = null;
+    
+    removeLoadingMessage();
+    
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Son satır tamamlanmamış olabilir
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const jsonStr = line.slice(6); // "data: " kısmını çıkar
+                        const data = JSON.parse(jsonStr);
+                        
+                        if (data.type === 'metadata') {
+                            // Metadata alındı - RAG bilgileri
+                            metadata = data;
+                            console.log('[CHAT] Streaming metadata:', metadata);
+                            
+                            // Loading mesajını kaldır ve streaming mesajı oluştur
+                            if (!streamingMessageDiv) {
+                                const chatBox = document.getElementById('chat-box');
+                                streamingMessageDiv = document.createElement('div');
+                                streamingMessageDiv.className = 'message bot';
+                                streamingMessageDiv.innerHTML = '<pre></pre>';
+                                chatBox.appendChild(streamingMessageDiv);
+                            }
+                            
+                            // RAG glow'u ayarla
+                            if (metadata.rag_source && metadata.rag_emoji) {
+                                setActivePdfGlow(metadata.rag_source, metadata.rag_emoji);
+                            }
+                        } else if (data.type === 'chunk') {
+                            // Chunk alındı - içeriği ekle
+                            const chunk = data.content || '';
+                            fullContent += chunk;
+                            
+                            // Streaming mesajını güncelle
+                            if (!streamingMessageDiv) {
+                                const chatBox = document.getElementById('chat-box');
+                                streamingMessageDiv = document.createElement('div');
+                                streamingMessageDiv.className = 'message bot';
+                                streamingMessageDiv.innerHTML = '<pre></pre>';
+                                chatBox.appendChild(streamingMessageDiv);
+                            }
+                            
+                            updateStreamingMessage(fullContent, streamingMessageDiv);
+                        } else if (data.type === 'done') {
+                            // Streaming tamamlandı
+                            console.log('[CHAT] Streaming tamamlandı');
+                            if (data.conversation_id) {
+                                window.currentConversationId = data.conversation_id;
+                            }
+                            disableInput(false);
+                            return;
+                        } else if (data.type === 'error' || data.error) {
+                            // Hata durumu
+                            const errorMsg = data.error || 'Bilinmeyen hata';
+                            console.error('[CHAT] Streaming hatası:', errorMsg);
+                            if (streamingMessageDiv) {
+                                streamingMessageDiv.remove();
+                            }
+                            addMessage('Hata: ' + errorMsg, false);
+                            setFaceFromText('😵');
+                            disableInput(false);
+                            return;
+                        }
+                    } catch (parseError) {
+                        console.error('[CHAT] JSON parse hatası:', parseError, 'Line:', line);
+                    }
+                }
+            }
+        }
+        
+        // Streaming tamamlandı ama done mesajı gelmediyse
+        if (streamingMessageDiv && fullContent) {
+            console.log('[CHAT] Streaming tamamlandı (buffer sonu)');
+            disableInput(false);
+        } else {
+            // Hiçbir içerik gelmediyse hata göster
+            if (streamingMessageDiv) {
+                streamingMessageDiv.remove();
+            }
+            addMessage('Yanıt alınamadı', false);
+            disableInput(false);
+        }
+    } catch (streamError) {
+        console.error('[CHAT] Streaming işleme hatası:', streamError);
+        if (streamingMessageDiv) {
+            streamingMessageDiv.remove();
+        }
+        addMessage('Streaming hatası: ' + streamError.message, false);
         setFaceFromText('😵');
         disableInput(false);
     }

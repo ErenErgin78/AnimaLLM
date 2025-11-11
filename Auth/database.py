@@ -134,8 +134,7 @@ def init_db():
         
         # Tüm tabloları oluştur (yeni yapıyla)
         Base.metadata.create_all(bind=engine)
-        print(f"[DATABASE] Veritabanı başlatıldı: {DATABASE_URL}")
-        print(f"[DATABASE] Tablolar oluşturuldu (conversations ve chat_history conversation_id ile)")
+        print(f"[DATABASE] Veritabanı başlatıldı")
     except Exception as e:
         print(f"[DATABASE ERROR] Veritabanı başlatma hatası: {e}")
         raise

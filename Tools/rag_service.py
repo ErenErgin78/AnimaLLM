@@ -123,7 +123,6 @@ class RagService:
         os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
         try:
             if Settings is not None:
-                print("[RAG] Chroma PersistentClient başlatılıyor (telemetri kapalı)...")
                 self._client = chromadb.PersistentClient(
                     path=str(CHROMA_DIR),
                     settings=Settings(anonymized_telemetry=False),

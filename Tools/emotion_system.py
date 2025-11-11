@@ -159,7 +159,6 @@ class EmotionChatbot:
             return
         
         self._lora_loading = True
-        print("[EMOTION] Asenkron LoRA model yükleme başlatılıyor...")
         
         import threading
         def load_in_background():
@@ -239,7 +238,6 @@ class EmotionChatbot:
                 return
             
             print(f"[LoRA] Base model yükleniyor: ytu-ce-cosmos/turkish-gpt2-large")
-            print(f"[LoRA] Adaptör yolu: {lora_path}")
             
             # Base model ve tokenizer'ı yükle
             base_model_name = "ytu-ce-cosmos/turkish-gpt2-large"
@@ -257,7 +255,6 @@ class EmotionChatbot:
             # Tokenizer'ı yükle - önce local'den dene, yoksa base model'den
             tokenizer_path = lora_path / "tokenizer.json"
             if tokenizer_path.exists():
-                print(f"[LoRA] Local tokenizer bulundu, yükleniyor...")
                 tokenizer = AutoTokenizer.from_pretrained(str(lora_path))
             else:
                 tokenizer = AutoTokenizer.from_pretrained(base_model_name)
@@ -354,7 +351,6 @@ class EmotionChatbot:
             # Model tipini ve LoRA durumunu kontrol et
             if hasattr(self.lora_model, 'peft_config'):
                 print(f"[LoRA] LoRA adaptörü başarıyla eklendi")
-                print(f"[LoRA] PEFT config: {list(self.lora_model.peft_config.keys())}")
             else:
                 print("[WARNING] LoRA adaptörü eklenmiş gibi görünmüyor, PEFT config bulunamadı")
             

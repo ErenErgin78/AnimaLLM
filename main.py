@@ -12,9 +12,10 @@ import os
 import re
 import html
 from typing import Any, Dict
-from fastapi import FastAPI, HTTPException, Header
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, Header, Query
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -324,11 +325,8 @@ def _summarize_text_if_needed(text: str, estimated_tokens: int, token_threshold:
         return text
 
 # RAG modelini asenkron olarak önceden yükle
-print("[CHAIN SYSTEM] RAG modeli asenkron olarak yükleniyor...")
 rag_service.preload_model_async()
 
-# LoRA modelini asenkron olarak önceden yükle - Global EmotionChatbot instance oluştur
-print("[CHAIN SYSTEM] LoRA modeli asenkron olarak yükleniyor...")
 # LoRA yüklemesi için EmotionChatbot instance'ı oluştur (client=None, Gemini kullanacak)
 # Chat için lazım olana kadar beklenmez, sadece LoRA yüklemesi için
 if chatbot_instance is None:
@@ -520,7 +518,7 @@ def create_flow_decision_chain():
 
 
 def create_rag_chain():
-    """RAG chain'i oluşturur"""
+    """RAG chain'i oluşturur - Streaming desteği ile"""
     rag_prompt = PromptTemplate(
         input_variables=["input"],
         template="""Sen bir hayvan bakımı bilgi asistanısın. Verilen kullanıcı mesajını kullanarak kullanıcının sorusunu yanıtla. 
@@ -530,11 +528,47 @@ def create_rag_chain():
         Kullanıcı Mesajı: {input}"""
     )
     
-    def rag_processor(input_data):
-        """RAG işleyicisi - Gemini ve OpenAI çıktılarını normalize eder"""
-        try:
-            print(f"[RAG DEBUG] Input data: {input_data}")
-            print(f"[RAG DEBUG] LLM çağrısı başlatılıyor...")
+    def rag_processor(input_data, stream: bool = False):
+        """RAG işleyicisi - Gemini ve OpenAI çıktılarını normalize eder, streaming desteği ile"""
+        try:       
+            if stream:
+                # Streaming modu - Gemini streaming kullan
+                print(f"[RAG DEBUG] Streaming modu aktif, LLM çağrısı başlatılıyor...")
+                
+                # Gemini streaming için doğrudan API kullan
+                try:
+                    import google.generativeai as genai
+                    api_key = os.getenv("GEMINI_API_KEY")
+                    if api_key:
+                        genai.configure(api_key=api_key)
+                        model = genai.GenerativeModel('gemini-2.5-flash')
+                        
+                        # Prompt'u hazırla
+                        formatted_prompt = rag_prompt.format(**input_data)
+                        
+                        # Streaming response üretici
+                        def generate_stream():
+                            try:
+                                response = model.generate_content(
+                                    formatted_prompt,
+                                    stream=True
+                                )
+                                
+                                for chunk in response:
+                                    if chunk.text:
+                                        yield chunk.text
+                            except Exception as e:
+                                print(f"[RAG ERROR] Streaming hatası: {e}")
+                                yield f"RAG sistemi hatası: {str(e)}"
+                        
+                        return generate_stream()
+                except Exception as e:
+                    print(f"[RAG ERROR] Gemini streaming hatası: {e}")
+                    # Fallback: normal moda geç
+                    pass
+            
+            # Normal mod (streaming değil)
+            print(f"[RAG DEBUG] Normal mod, LLM çağrısı başlatılıyor...")
             
             # Timeout ile LLM çağrısı yap
             import threading
@@ -708,8 +742,8 @@ def create_main_processing_chain():
     emotion_processor = create_emotion_chain()
     stats_processor = create_stats_chain()
     
-    def process_message(user_message: str, user_id: int | None = None) -> Dict[str, Any]:
-        """Ana mesaj işleme fonksiyonu - SQLite tabanlı sohbet geçmişi ile"""
+    def process_message(user_message: str, user_id: int | None = None, **kwargs) -> Dict[str, Any]:
+        """Ana mesaj işleme fonksiyonu - SQLite tabanlı sohbet geçmişi ile, streaming desteği ile"""
         try:
             print("[CHAIN SYSTEM] AŞAMA 1: Akış kararı alınıyor...")
             
@@ -721,13 +755,18 @@ def create_main_processing_chain():
             result = None
             if flow_decision == "RAG":
                 print("[CHAIN SYSTEM] AŞAMA 2: RAG akışı çalışıyor...")
-                rag_result = _process_rag_flow(user_message, rag_chain)
+                # Streaming parametresini al (varsayılan False)
+                stream = kwargs.get("stream", False)
+                rag_result = _process_rag_flow(user_message, rag_chain, stream=stream)
                 if rag_result is None:
                     print("[CHAIN SYSTEM] RAG sonucu None, HELP akışına yönlendiriliyor...")
                     help_result = _process_help_flow(user_message)
                     help_result["flow_type"] = "HELP"
                     result = help_result
                 else:
+                    # Streaming moduysa generator döndür
+                    if stream and hasattr(rag_result, '__iter__') and not isinstance(rag_result, dict):
+                        return rag_result
                     rag_result["flow_type"] = "RAG"
                     result = rag_result
             elif flow_decision == "ANIMAL":
@@ -766,8 +805,8 @@ def create_main_processing_chain():
     return process_message
 
 
-def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
-    """RAG akışını işler - PDF'lerden bilgi çeker"""
+def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
+    """RAG akışını işler - PDF'lerden bilgi çeker, streaming desteği ile"""
     t = user_message.lower()
     
     # Heuristic: explicit source keywords (hayvan bakım)
@@ -798,7 +837,39 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
         
         # RAG chain ile işle - context'i prompt'a dahil et
         combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
-        result = rag_chain({"input": combined_input})
+        result = rag_chain({"input": combined_input}, stream=stream)
+        
+        # Streaming moduysa generator döndür
+        if stream and hasattr(result, '__iter__') and not isinstance(result, str):
+            # Pick first known source for UI hint
+            lit = None
+            for s in sources:
+                if s in RAG_SOURCES:
+                    lit = s
+                    break
+            ui = RAG_SOURCES.get(lit or "", None)
+            
+            # Streaming generator wrapper
+            def stream_wrapper():
+                # Önce metadata gönder
+                metadata = {
+                    "type": "metadata",
+                    "rag": True,
+                    "rag_source": ui.get("id") if ui else None,
+                    "rag_emoji": ui.get("emoji") if ui else None,
+                }
+                yield f"data: {json.dumps(metadata, ensure_ascii=False)}\n\n"
+                
+                # Sonra streaming content
+                for chunk in result:
+                    if chunk:
+                        data = {
+                            "type": "chunk",
+                            "content": chunk
+                        }
+                        yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+            
+            return stream_wrapper()
         
         # Pick first known source for UI hint
         lit = None
@@ -831,7 +902,33 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
     # RAG chain ile işle - context'i prompt'a dahil et
     combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
     print(f"[RAG DEBUG] Context uzunluğu: {len(context)} karakter")
-    result = rag_chain({"input": combined_input})
+    result = rag_chain({"input": combined_input}, stream=stream)
+    
+    # Streaming moduysa generator döndür
+    if stream and hasattr(result, '__iter__') and not isinstance(result, str):
+        ui = RAG_SOURCES.get(source)
+        
+        # Streaming generator wrapper
+        def stream_wrapper():
+            # Önce metadata gönder
+            metadata = {
+                "type": "metadata",
+                "rag": True,
+                "rag_source": ui.get("id") if ui else None,
+                "rag_emoji": ui.get("emoji") if ui else None,
+            }
+            yield f"data: {json.dumps(metadata, ensure_ascii=False)}\n\n"
+            
+            # Sonra streaming content
+            for chunk in result:
+                if chunk:
+                    data = {
+                        "type": "chunk",
+                        "content": chunk
+                    }
+                    yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+        
+        return stream_wrapper()
     
     ui = RAG_SOURCES.get(source)
     return {
@@ -924,10 +1021,14 @@ def login_page() -> HTMLResponse:
 @app.post("/chat")
 def chat(
     payload: Dict[str, Any],
-    authorization: str | None = Header(None, alias="Authorization")
-) -> Dict[str, Any]:
-    """Ana chat endpoint'i - CHAIN SYSTEM ile akış yönlendirmesi yapar"""
+    authorization: str | None = Header(None, alias="Authorization"),
+    stream: bool = Query(False, description="Streaming modunu etkinleştir")
+):
+    """Ana chat endpoint'i - CHAIN SYSTEM ile akış yönlendirmesi yapar, streaming desteği ile"""
     user_message = str(payload.get("message", "")).strip()
+    
+    # Streaming parametresini al (query parametresi veya payload'dan)
+    stream_enabled = stream or payload.get("stream", False)
     
     # Conversation ID'sini al (opsiyonel - mevcut conversation'a mesaj eklemek için)
     conversation_id = payload.get("conversation_id")
@@ -942,16 +1043,30 @@ def chat(
     
     # Güvenlik kontrolleri
     if not user_message:
+        if stream_enabled:
+            def error_stream():
+                yield f"data: {json.dumps({'error': 'Mesaj boş olamaz'}, ensure_ascii=False)}\n\n"
+            return StreamingResponse(error_stream(), media_type="text/event-stream")
         return {"error": "Mesaj boş olamaz"}
     
     # Mesaj uzunluk kontrolü
     if not _validate_message_length(user_message):
-        return {"error": f"Mesaj çok uzun. Maksimum {MAX_MESSAGE_LENGTH} karakter olabilir."}
+        error_msg = f"Mesaj çok uzun. Maksimum {MAX_MESSAGE_LENGTH} karakter olabilir."
+        if stream_enabled:
+            def error_stream():
+                yield f"data: {json.dumps({'error': error_msg}, ensure_ascii=False)}\n\n"
+            return StreamingResponse(error_stream(), media_type="text/event-stream")
+        return {"error": error_msg}
     
     # Input sanitization
     user_message = _sanitize_input(user_message)
     if user_message == "[Güvenlik nedeniyle mesaj filtrelendi]":
-        return {"error": "Güvenlik nedeniyle mesaj filtrelendi"}
+        error_msg = "Güvenlik nedeniyle mesaj filtrelendi"
+        if stream_enabled:
+            def error_stream():
+                yield f"data: {json.dumps({'error': error_msg}, ensure_ascii=False)}\n\n"
+            return StreamingResponse(error_stream(), media_type="text/event-stream")
+        return {"error": error_msg}
     
     # Token kontrolü
     estimated_tokens = _estimate_tokens(user_message)
@@ -960,13 +1075,65 @@ def chat(
     # Özet sonrası yeniden tahmini token sayısı al (sert limit için paylaşımcı davranış)
     estimated_tokens = _estimate_tokens(user_message)
     if estimated_tokens > MAX_TOKENS_PER_REQUEST:
-        return {"error": f"Çok fazla token. Maksimum {MAX_TOKENS_PER_REQUEST} token olabilir."}
+        error_msg = f"Çok fazla token. Maksimum {MAX_TOKENS_PER_REQUEST} token olabilir."
+        if stream_enabled:
+            def error_stream():
+                yield f"data: {json.dumps({'error': error_msg}, ensure_ascii=False)}\n\n"
+            return StreamingResponse(error_stream(), media_type="text/event-stream")
+        return {"error": error_msg}
 
     try:
         # CHAIN SYSTEM ile mesaj işleme
-        print(f"[CHAIN SYSTEM] Mesaj işleniyor... Kullanıcı mesajı: {user_message[:100]}...")
-        result = main_chain(user_message, user_id)
+        print(f"[CHAIN SYSTEM] Mesaj işleniyor... Kullanıcı mesajı: {user_message[:100]}..., stream={stream_enabled}")
+        result = main_chain(user_message, user_id, stream=stream_enabled)
         
+        # Streaming moduysa generator döndür
+        if stream_enabled and hasattr(result, '__iter__') and not isinstance(result, dict):
+            def streaming_wrapper():
+                full_response = ""
+                try:
+                    for chunk_data in result:
+                        if chunk_data:
+                            yield chunk_data
+                            # Chunk içeriğini biriktir (conversation kaydı için)
+                            try:
+                                if chunk_data.startswith("data: "):
+                                    json_str = chunk_data[6:]  # "data: " kısmını çıkar
+                                    data = json.loads(json_str)
+                                    if data.get("type") == "chunk":
+                                        full_response += data.get("content", "")
+                            except Exception:
+                                pass
+                    
+                    # Streaming tamamlandı, conversation'a kaydet
+                    if user_id and full_response:
+                        try:
+                            saved_conversation_id = save_message_to_conversation(
+                                user_id=user_id,
+                                conversation_id=conversation_id,
+                                user_message=user_message,
+                                bot_response=full_response,
+                                flow_type="RAG"
+                            )
+                            if saved_conversation_id:
+                                final_data = {
+                                    "type": "done",
+                                    "conversation_id": saved_conversation_id
+                                }
+                                yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
+                        except Exception as e:
+                            print(f"[CHAIN SYSTEM] Conversation kayıt hatası: {e}")
+                except Exception as e:
+                    print(f"[CHAIN SYSTEM] Streaming hatası: {e}")
+                    error_data = {
+                        "type": "error",
+                        "error": str(e)
+                    }
+                    yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+            
+            return StreamingResponse(streaming_wrapper(), media_type="text/event-stream")
+        
+        # Normal mod (streaming değil)
         # Result'u kontrol et ve hata varsa düzelt
         if isinstance(result, dict) and "error" in result:
             print(f"[CHAIN SYSTEM] Hata tespit edildi: {result['error']}")
@@ -1000,12 +1167,21 @@ def chat(
         print(f"[CHAIN SYSTEM] HTTPException: {e.detail}")
         import traceback
         traceback.print_exc()
+        if stream_enabled:
+            def error_stream():
+                yield f"data: {json.dumps({'error': e.detail}, ensure_ascii=False)}\n\n"
+            return StreamingResponse(error_stream(), media_type="text/event-stream")
         return {"error": e.detail}
     except Exception as e:
         print(f"[CHAIN SYSTEM] Exception: {str(e)}")
         import traceback
         traceback.print_exc()
-        return {"error": f"Sunucu hatası: {str(e)}"}
+        error_msg = f"Sunucu hatası: {str(e)}"
+        if stream_enabled:
+            def error_stream():
+                yield f"data: {json.dumps({'error': error_msg}, ensure_ascii=False)}\n\n"
+            return StreamingResponse(error_stream(), media_type="text/event-stream")
+        return {"error": error_msg}
 
 
 # Çalıştırma:
