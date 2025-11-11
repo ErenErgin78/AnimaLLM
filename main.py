@@ -336,31 +336,70 @@ def create_flow_decision_chain():
     
     def flow_processor(input_data):
         """Flow decision işleyicisi - Gemini ve OpenAI çıktılarını normalize eder"""
-        result = (flow_prompt | llm).invoke(input_data)
-        
-        # Ham cevabı konsola yazdır
-        print(f"[FLOW DEBUG] Ham result tipi: {type(result)}")
-        print(f"[FLOW DEBUG] Ham result: {result}")
-        
-        # Gemini ve OpenAI çıktılarını normalize et
-        if hasattr(result, 'content'):
-            # LangChain response objesi
-            text = result.content
-            print(f"[FLOW DEBUG] Content: {text}")
-        elif isinstance(result, str):
-            # String çıktı
-            text = result
-            print(f"[FLOW DEBUG] String: {text}")
-        else:
-            # Diğer durumlar için string'e çevir
-            text = str(result)
-            print(f"[FLOW DEBUG] String'e çevriliyor: {text}")
-        
-        # FlowDecisionParser'ı kullan
-        parser = FlowDecisionParser()
-        parsed_result = parser.parse(text)
-        print(f"[FLOW DEBUG] Parsed result: {parsed_result}")
-        return parsed_result
+        try:
+            print(f"[FLOW DEBUG] Input data: {input_data}")
+            print(f"[FLOW DEBUG] LLM çağrısı başlatılıyor...")
+            
+            # Timeout ile LLM çağrısı yap
+            import threading
+            
+            # Thread-safe sonuç saklama
+            result_container = {'result': None, 'error': None}
+            
+            def call_llm():
+                try:
+                    result_container['result'] = (flow_prompt | llm).invoke(input_data)
+                except Exception as e:
+                    result_container['error'] = str(e)
+            
+            # Thread ile çağrı yap ve timeout kontrolü
+            thread = threading.Thread(target=call_llm)
+            thread.daemon = True
+            thread.start()
+            thread.join(timeout=30)  # 30 saniye timeout
+            
+            if thread.is_alive():
+                print("[FLOW ERROR] LLM çağrısı timeout oldu (30 saniye)")
+                return "HELP"  # Timeout durumunda HELP döndür
+            
+            if result_container['error']:
+                print(f"[FLOW ERROR] LLM çağrısı hatası: {result_container['error']}")
+                return "HELP"  # Hata durumunda HELP döndür
+            
+            result = result_container['result']
+            if result is None:
+                print("[FLOW ERROR] LLM çağrısı None döndü")
+                return "HELP"
+            
+            # Ham cevabı konsola yazdır
+            print(f"[FLOW DEBUG] Ham result tipi: {type(result)}")
+            print(f"[FLOW DEBUG] Ham result: {result}")
+            
+            # Gemini ve OpenAI çıktılarını normalize et
+            if hasattr(result, 'content'):
+                # LangChain response objesi
+                text = result.content
+                print(f"[FLOW DEBUG] Content: {text}")
+            elif isinstance(result, str):
+                # String çıktı
+                text = result
+                print(f"[FLOW DEBUG] String: {text}")
+            else:
+                # Diğer durumlar için string'e çevir
+                text = str(result)
+                print(f"[FLOW DEBUG] String'e çevriliyor: {text}")
+            
+            # FlowDecisionParser'ı kullan
+            parser = FlowDecisionParser()
+            parsed_result = parser.parse(text)
+            print(f"[FLOW DEBUG] Parsed result: {parsed_result}")
+            return parsed_result
+            
+        except Exception as e:
+            print(f"[FLOW ERROR] Beklenmeyen hata: {e}")
+            import traceback
+            traceback.print_exc()
+            return "HELP"  # Hata durumunda HELP döndür
     
     return flow_processor
 
@@ -380,25 +419,64 @@ def create_rag_chain():
     
     def rag_processor(input_data):
         """RAG işleyicisi - Gemini ve OpenAI çıktılarını normalize eder"""
-        result = (rag_prompt | llm).invoke(input_data)
-        
-        # Ham cevabı konsola yazdır
-        print(f"[RAG DEBUG] Ham result tipi: {type(result)}")
-        print(f"[RAG DEBUG] Ham result: {result}")
-        
-        # Gemini ve OpenAI çıktılarını normalize et
-        if hasattr(result, 'content'):
-            # LangChain response objesi
-            print(f"[RAG DEBUG] Content: {result.content}")
-            return result.content
-        elif isinstance(result, str):
-            # String çıktı
-            print(f"[RAG DEBUG] String: {result}")
-            return result
-        else:
-            # Diğer durumlar için string'e çevir
-            print(f"[RAG DEBUG] String'e çevriliyor: {str(result)}")
-            return str(result)
+        try:
+            print(f"[RAG DEBUG] Input data: {input_data}")
+            print(f"[RAG DEBUG] LLM çağrısı başlatılıyor...")
+            
+            # Timeout ile LLM çağrısı yap
+            import threading
+            
+            # Thread-safe sonuç saklama
+            result_container = {'result': None, 'error': None}
+            
+            def call_llm():
+                try:
+                    result_container['result'] = (rag_prompt | llm).invoke(input_data)
+                except Exception as e:
+                    result_container['error'] = str(e)
+            
+            # Thread ile çağrı yap ve timeout kontrolü
+            thread = threading.Thread(target=call_llm)
+            thread.daemon = True
+            thread.start()
+            thread.join(timeout=30)  # 30 saniye timeout
+            
+            if thread.is_alive():
+                print("[RAG ERROR] LLM çağrısı timeout oldu (30 saniye)")
+                return "RAG sistemi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+            
+            if result_container['error']:
+                print(f"[RAG ERROR] LLM çağrısı hatası: {result_container['error']}")
+                return f"RAG sistemi hatası: {result_container['error']}"
+            
+            result = result_container['result']
+            if result is None:
+                print("[RAG ERROR] LLM çağrısı None döndü")
+                return "RAG sistemi yanıt veremedi."
+            
+            # Ham cevabı konsola yazdır
+            print(f"[RAG DEBUG] Ham result tipi: {type(result)}")
+            print(f"[RAG DEBUG] Ham result: {result}")
+            
+            # Gemini ve OpenAI çıktılarını normalize et
+            if hasattr(result, 'content'):
+                # LangChain response objesi
+                print(f"[RAG DEBUG] Content: {result.content}")
+                return result.content
+            elif isinstance(result, str):
+                # String çıktı
+                print(f"[RAG DEBUG] String: {result}")
+                return result
+            else:
+                # Diğer durumlar için string'e çevir
+                print(f"[RAG DEBUG] String'e çevriliyor: {str(result)}")
+                return str(result)
+                
+        except Exception as e:
+            print(f"[RAG ERROR] Beklenmeyen hata: {e}")
+            import traceback
+            traceback.print_exc()
+            return f"RAG sistemi hatası: {str(e)}"
     
     return rag_processor
 
@@ -803,7 +881,7 @@ def chat(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         # CHAIN SYSTEM ile mesaj işleme
-        print("[CHAIN SYSTEM] Mesaj işleniyor...")
+        print(f"[CHAIN SYSTEM] Mesaj işleniyor... Kullanıcı mesajı: {user_message[:100]}...")
         result = main_chain(user_message)
         
         # Result'u kontrol et ve hata varsa düzelt
@@ -821,9 +899,13 @@ def chat(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     except HTTPException as e:
         print(f"[CHAIN SYSTEM] HTTPException: {e.detail}")
+        import traceback
+        traceback.print_exc()
         return {"error": e.detail}
     except Exception as e:
         print(f"[CHAIN SYSTEM] Exception: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {"error": f"Sunucu hatası: {str(e)}"}
 
 
