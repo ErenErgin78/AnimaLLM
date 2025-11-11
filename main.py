@@ -660,7 +660,7 @@ def create_emotion_chain():
                 chatbot_instance = EmotionChatbot()  # client=None, Gemini kullanacak
                 print("[EMOTION] Gemini API kullanılıyor")
         
-        result = chatbot_instance.chat(user_message)
+        result = chatbot_instance.chat(user_message, user_id)
         
         # Yeni emotion_system formatına uygun response döndür
         # Format: {"response": lora_response, "emoji": emoji, "mood": mood, "stats": stats}
@@ -681,12 +681,12 @@ def create_emotion_chain():
 
 
 def create_stats_chain():
-    """Stats chain'i oluşturur - data/ dosyalarından hesaplar"""
+    """Stats chain'i oluşturur - kullanıcı bazlı duygu istatistikleri"""
     stats_system = StatisticSystem()
 
     def stats_processor(user_message: str, user_id: int | None = None) -> Dict[str, Any]:
         try:
-            result = stats_system.answer(user_message)
+            result = stats_system.answer(user_message, user_id)
             return result
         except Exception as e:
             err = f"İstatistik sistemi hatası: {e}"

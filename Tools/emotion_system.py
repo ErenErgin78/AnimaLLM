@@ -8,8 +8,8 @@ Bu modül LoRA model ile metin üretimi ve LLM ile duygu analizi yapar.
 - mood_emojis.json'dan duyguya göre emoji seçer
 """
 
-import os
 import json
+import os
 import random
 import re
 import html
@@ -17,6 +17,9 @@ from typing import Any, Dict, Optional
 from datetime import datetime
 from pathlib import Path
 from openai import OpenAI
+
+from Auth.database import get_db
+from Auth.models import EmotionLog
 
 # LoRA model için gerekli importlar
 try:
@@ -42,22 +45,15 @@ DANGEROUS_EMOTION_PATTERNS = [
 
 # Duygu → emoji veri kaynağını yükle (uygulama başında bir kez)
 MOOD_EMOJIS: Dict[str, list[str]] = {}
-# Kalıcı depolama dosyaları (proje kökü /data)
+# mood_emojis.json dosyası (proje kökü /data)
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
-CHAT_HISTORY_FILE = DATA_DIR / "chat_history.txt"
-MOOD_COUNTER_FILE = DATA_DIR / "mood_counter.txt"
 
 try:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     data_path = DATA_DIR / "mood_emojis.json"
     if data_path.exists():
+        import json
         MOOD_EMOJIS = json.loads(data_path.read_text(encoding="utf-8"))
-    # Dosyaları oluştur
-    if not CHAT_HISTORY_FILE.exists():
-        CHAT_HISTORY_FILE.write_text("", encoding="utf-8")
-    if not MOOD_COUNTER_FILE.exists():
-        # Yeni format: boş JSON array (zaman damgalı kayıtlar)
-        MOOD_COUNTER_FILE.write_text("[]", encoding="utf-8")
 except Exception:
     MOOD_EMOJIS = {}
 
@@ -90,13 +86,6 @@ class EmotionChatbot:
             "Endişeli", "Gülümseyen", "Flörtöz", "Sorgulayıcı", "Yorgun"
         ]
         self.emotion_counts: Dict[str, int] = {m: 0 for m in self.allowed_moods}
-        
-        # Kalıcı sayaçları yükle
-        persisted = self._load_mood_counts()
-        if persisted:
-            for k, v in persisted.items():
-                if k in self.emotion_counts and isinstance(v, int):
-                    self.emotion_counts[k] = v
         
         # LoRA model ve tokenizer için lazy loading
         self.lora_model = None
@@ -135,106 +124,30 @@ class EmotionChatbot:
                     prompt_parts.append(f"Asistan: {content}")
         return "\n".join(prompt_parts)
 
-    def _load_mood_counts(self) -> Dict[str, int]:
-        """Kalıcı duygu sayaçlarını yükler - eski ve yeni formatı destekler"""
+    def _log_mood_to_db(self, user_id: int, mood: str) -> None:
+        """Duygu kaydını SQLite veritabanına ekler"""
+        if not user_id or not mood:
+            return
+        
         try:
-            raw = MOOD_COUNTER_FILE.read_text(encoding="utf-8").strip()
-            if not raw:
-                return {}
-            
-            data = json.loads(raw)
-            
-            # Yeni format: JSON array (zaman damgalı kayıtlar)
-            if isinstance(data, list):
-                counts: Dict[str, int] = {m: 0 for m in self.allowed_moods}
-                for record in data:
-                    if isinstance(record, dict):
-                        mood = str(record.get("mood", "")).strip()
-                        if mood in counts:
-                            counts[mood] += 1
-                return counts
-            
-            # Eski format: JSON object (sayılar)
-            elif isinstance(data, dict):
-                return {str(k): int(v) for k, v in data.items()}
-        except Exception:
-            pass
-        return {}
-
-    def _load_mood_history(self) -> list[Dict[str, Any]]:
-        """Zaman damgalı duygu kayıtlarını yükler"""
-        try:
-            raw = MOOD_COUNTER_FILE.read_text(encoding="utf-8").strip()
-            if not raw:
-                return []
-            
-            data = json.loads(raw)
-            
-            # Yeni format: JSON array
-            if isinstance(data, list):
-                return data
-            
-            # Eski format: JSON object - yeni formata dönüştür
-            elif isinstance(data, dict):
-                history = []
-                today = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                for mood, count in data.items():
-                    if isinstance(count, int) and count > 0:
-                        # Her sayı için bir kayıt oluştur (bugünün tarihiyle)
-                        for _ in range(min(count, 1000)):  # Güvenlik için maksimum 1000
-                            history.append({
-                                "mood": str(mood).strip(),
-                                "timestamp": today
-                            })
-                return history
+            db = next(get_db())
         except Exception as e:
-            print(f"[EMOTION] Duygu geçmişi yükleme hatası: {e}")
-        return []
-
-    def _append_mood_record(self, mood: str) -> None:
-        """Duygu kaydını zaman damgasıyla kalıcı olarak ekler"""
+            print(f"[EMOTION] DB bağlantısı oluşturulamadı: {e}")
+            return
+        
         try:
-            # Mevcut kayıtları yükle
-            history = self._load_mood_history()
-            
-            # Yeni kayıt ekle
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            history.append({
-                "mood": str(mood).strip(),
-                "timestamp": timestamp
-            })
-            
-            # Güvenlik: Maksimum 10000 kayıt tut (eski kayıtları koru)
-            if len(history) > 10000:
-                # En eski kayıtları sil, son 10000'i tut
-                history = history[-10000:]
-            
-            # Dosyaya kaydet
-            MOOD_COUNTER_FILE.write_text(
-                json.dumps(history, ensure_ascii=False, indent=2),
-                encoding="utf-8",
+            log = EmotionLog(
+                user_id=int(user_id),
+                mood=str(mood).strip()
             )
-            print(f"[EMOTION] Duygu kaydı dosyaya yazıldı: {mood} ({timestamp})")
+            db.add(log)
+            db.commit()
+            print(f"[EMOTION] Duygu kaydı SQLite'a yazıldı: user_id={user_id}, mood={mood}")
         except Exception as e:
-            print(f"[EMOTION] Duygu kaydı ekleme hatası: {e}")
-
-    def _save_mood_counts(self) -> None:
-        """Geriye uyumluluk için - artık kullanılmıyor, _append_mood_record kullanılmalı"""
-        # Bu metod artık kullanılmıyor ama geriye uyumluluk için bırakıldı
-        pass
-
-    def _append_chat_history(self, user_message: str, response_text: str) -> None:
-        """Konuşma geçmişini dosyaya ekler"""
-        try:
-            line = json.dumps({
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "user": user_message,
-                "response": response_text
-            }, ensure_ascii=False)
-            with CHAT_HISTORY_FILE.open("a", encoding="utf-8") as f:
-                f.write(line + "\n")
-        except Exception:
-            pass
+            db.rollback()
+            print(f"[EMOTION] Duygu kaydı ekleme hatası (DB): {e}")
+        finally:
+            db.close()
 
     def get_functions(self) -> list[Dict[str, Any]]:
         """Emotion sistemi için function-calling kullanılmıyor"""
@@ -655,7 +568,7 @@ class EmotionChatbot:
         
         return text
 
-    def chat(self, user_message: str) -> Dict[str, Any]:
+    def chat(self, user_message: str, user_id: int | None = None) -> Dict[str, Any]:
         """Ana sohbet fonksiyonu - LoRA modelinden cevap, sonra LLM'den duygu"""
         # Güvenlik kontrolleri
         if not user_message:
@@ -727,7 +640,10 @@ Seçilebilecek ruh halleri (sadece bu listeden seç):
 - Sorgulayıcı
 - Yorgun
 
-ÖNEMLİ: Sadece JSON formatında cevap ver. Metin ekleme, açıklama yapma."""
+ÖNEMLİ TALİMATLAR:
+1. Kullanıcı mesajındaki duygu ifadeleri daima birinci önceliktir. Kullanıcı kendini 'üzgün' olarak tanımlıyorsa, asistan cevabı ne olursa olsun 'Üzgün' seçmelisin.
+2. Asistan cevabı, kullanıcıya verilen yanıtı temsil eder ve bağlamı pekiştirmek içindir.
+3. Girdi formatı dışında hiçbir metin yazma, yalnızca tek bir JSON nesnesi döndür."""
         
         messages_payload: list[Dict[str, Any]] = [
             {"role": "system", "content": "Sen bir duygu analiz asistanısın. Verilen metni analiz edip sadece JSON formatında duygu döndürürsün. Başka hiçbir şey yazmazsın."},
@@ -804,13 +720,15 @@ Seçilebilecek ruh halleri (sadece bu listeden seç):
         
         # Duygu kaydını zaman damgasıyla ekle
         mood_raw = str(emotion_data.get("ruh_hali", ""))
-        if mood_raw.strip() in self.emotion_counts:
-            self.emotion_counts[mood_raw.strip()] += 1
-            # Zaman damgalı kayıt ekle
-            self._append_mood_record(mood_raw.strip())
-            print(f"[EMOTION] Duygu kaydedildi: {mood_raw.strip()}")
+        normalized_mood = mood_raw.strip()
+        if normalized_mood in self.emotion_counts:
+            self.emotion_counts[normalized_mood] += 1
+            print(f"[EMOTION] Duygu kaydedildi: {normalized_mood}")
         else:
-            print(f"[EMOTION] Duygu kaydedilemedi: '{mood_raw.strip()}' allowed_moods listesinde yok")
+            print(f"[EMOTION] Duygu kaydedilemedi: '{normalized_mood}' allowed_moods listesinde yok")
+        
+        if user_id:
+            self._log_mood_to_db(user_id, normalized_mood)
         
         # Emoji seçim: mood_emojis.json'dan duyguya göre rastgele
         def normalize_mood(name: str) -> str:
@@ -897,11 +815,8 @@ Seçilebilecek ruh halleri (sadece bu listeden seç):
         else:
             print(f"[EMOTION] WARNING: Emoji None döndü! Duygu: {mood_raw}")
             # Fallback: eğer emoji bulunamazsa varsayılan emoji kullan
-            emoji = '🙂'
+            emoji = '❓'
             print(f"[EMOTION] Fallback emoji kullanılıyor: {emoji}")
-        
-        # Konuşma geçmişini kaydet
-        self._append_chat_history(user_message, lora_response)
         
         # Response format: Frontend'in beklediği format
         return {
