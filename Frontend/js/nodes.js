@@ -874,3 +874,73 @@ function toggleFlowerMode() {
     }
 }
 
+/**
+ * Tüm node'lerin pozisyonlarını ekran sınırları içinde tutar
+ * Resize event'inde çağrılır
+ */
+function constrainAllNodes() {
+    try {
+        // Tüm node'ları al
+        const allNodes = document.querySelectorAll('.func-node');
+        const container = document.querySelector('.container');
+        
+        if (!container) return;
+        
+        const cRect = container.getBoundingClientRect();
+        const minGap = 8; // Minimum kenar boşluğu
+        const topOffset = 80; // Üst boşluk (action button'lar için)
+        const sideGap = 12; // Container yanındaki boşluk
+        
+        allNodes.forEach(node => {
+            // Eğer node collapsed durumdaysa atla (parent merkezinde)
+            if (node.classList.contains('collapsed')) return;
+            
+            const rect = node.getBoundingClientRect();
+            const side = node.dataset.side || 'left';
+            
+            // Mevcut pozisyonu al
+            let currentLeft = rect.left;
+            let currentTop = rect.top;
+            
+            // Yatay sınır kontrolü
+            let newLeft = currentLeft;
+            
+            // Container'a göre side constraint
+            if (side === 'left') {
+                // Sol taraftaki node'lar container'ın solunda olmalı
+                const maxLeft = cRect.left - rect.width - sideGap;
+                newLeft = Math.min(newLeft, maxLeft);
+                // Ekranın sol kenarından taşmamalı
+                newLeft = Math.max(newLeft, minGap);
+            } else if (side === 'right') {
+                // Sağ taraftaki node'lar container'ın sağında olmalı
+                const minLeft = cRect.right + sideGap;
+                newLeft = Math.max(newLeft, minLeft);
+                // Ekranın sağ kenarından taşmamalı
+                newLeft = Math.min(newLeft, window.innerWidth - rect.width - minGap);
+            } else {
+                // Side bilgisi yoksa genel sınır kontrolü
+                newLeft = Math.max(minGap, Math.min(window.innerWidth - rect.width - minGap, newLeft));
+            }
+            
+            // Dikey sınır kontrolü
+            const newTop = Math.max(topOffset, Math.min(window.innerHeight - rect.height - minGap, currentTop));
+            
+            // Pozisyonu güncelle (sadece değişiklik varsa)
+            if (Math.abs(newLeft - currentLeft) > 1 || Math.abs(newTop - currentTop) > 1) {
+                node.style.left = newLeft + 'px';
+                node.style.right = 'auto';
+                node.style.top = newTop + 'px';
+            }
+        });
+        
+        // Halatları güncelle
+        if (typeof updateRopesImmediate === 'function') {
+            updateRopesImmediate();
+        }
+    } catch (e) {
+        // Hata olsa da sessizce devam et
+        console.error('constrainAllNodes error:', e);
+    }
+}
+

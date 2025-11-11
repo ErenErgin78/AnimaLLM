@@ -21,6 +21,11 @@ window.addEventListener('resize', () => {
         svg.setAttribute('height', window.innerHeight);
     }
     
+    // Node pozisyonlarını sınırlar içinde tut (resize sırasında ekran dışına çıkmalarını önle)
+    if (typeof constrainAllNodes === 'function') {
+        constrainAllNodes();
+    }
+    
     // Rope sistemini güncelle (varsa)
     if (typeof recomputeRestLenAll === 'function') {
         recomputeRestLenAll();

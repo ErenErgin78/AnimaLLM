@@ -89,18 +89,39 @@ async function sendMessage() {
     disableInput(true);
     
     try {
-        // Backend'e istek gönder
-        const resp = await fetch('/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message })
-        });
+        console.log('[CHAT] Mesaj gönderiliyor:', message);
+        
+        // Backend'e istek gönder (timeout ile)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 saniye timeout
+        
+        let resp;
+        try {
+            resp = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message }),
+                signal: controller.signal
+            });
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError.name === 'AbortError') {
+                throw new Error('İstek zaman aşımına uğradı (60 saniye)');
+            }
+            throw fetchError;
+        }
+        clearTimeout(timeoutId);
+        
+        console.log('[CHAT] Response alındı, status:', resp.status);
         
         if (!resp.ok) {
-            throw new Error(`HTTP ${resp.status}`);
+            const errorText = await resp.text();
+            console.error('[CHAT] HTTP hatası:', resp.status, errorText);
+            throw new Error(`HTTP ${resp.status}: ${errorText}`);
         }
         
         const data = await resp.json();
+        console.log('[CHAT] Response data:', data);
         
         // İstatistik sayacını güncelle
         if (data.stats) {
@@ -224,8 +245,10 @@ async function sendMessage() {
         disableInput(false);
         
     } catch (e) {
+        console.error('[CHAT] Hata oluştu:', e);
         removeLoadingMessage();
-        addMessage('Bağlantı hatası: ' + e.message, false);
+        const errorMsg = e.message || 'Bilinmeyen hata';
+        addMessage('Bağlantı hatası: ' + errorMsg, false);
         setFaceFromText('😵');
         disableInput(false);
     }

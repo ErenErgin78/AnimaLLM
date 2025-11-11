@@ -43,8 +43,10 @@ function fitFaceEmoji() {
     const node = document.getElementById('face-emoji');
     if (!container || !node) return;
     
-    const maxW = container.clientWidth - 1rem; /* 16px */
-    const maxH = container.clientHeight - 1rem; /* 16px */
+    // 1rem genellikle 16px'e eşittir, bu yüzden 16 kullanıyoruz
+    const remInPixels = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const maxW = container.clientWidth - remInPixels; /* 1rem = genellikle 16px */
+    const maxH = container.clientHeight - remInPixels; /* 1rem = genellikle 16px */
     let size = 6; /* 96px = 6rem */
     
     node.style.fontSize = size + 'rem';
