@@ -48,6 +48,14 @@ class User(Base):
         server_default=func.now(),  # SQLite için CURRENT_TIMESTAMP
         nullable=False
     )
+
+    # Kullanıcıya ait çalışma alanı durumunu tekil ilişki olarak sakla
+    workspace_state = relationship(
+        "UserWorkspaceState",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
     
     def __repr__(self):
         """Kullanıcı objesinin string temsili - debug için"""
@@ -183,4 +191,37 @@ class EmotionLog(Base):
     def __repr__(self):
         """Duygu log kaydının string temsili - debug için"""
         return f"<EmotionLog(id={self.id}, user_id={self.user_id}, mood='{self.mood}', created_at='{self.created_at}')>"
+    
+
+class UserWorkspaceState(Base):
+    """
+    Kullanıcı çalışma alanı durumu modeli - node pozisyonları, bağlantı matrisi ve tema ayarlarını saklar
+    """
+
+    __tablename__ = "user_workspace_states"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    layout_json = Column(Text, nullable=False)
+    matrix_json = Column(Text, nullable=True)
+    theme = Column(String(100), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+        index=True
+    )
+
+    user = relationship("User", back_populates="workspace_state")
+
+    def __repr__(self):
+        """Workspace durumunun string temsili"""
+        return f"<UserWorkspaceState(id={self.id}, user_id={self.user_id}, theme='{self.theme}')>"
 

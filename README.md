@@ -228,6 +228,13 @@ Tarayıcınızda: `http://localhost:8000/`
 - **Canvas API**: Matrix efekti
 - **SVG**: Halat animasyonları
 
+### 🧾 Çalışma Alanı Kaydı (Workspace Persistence)
+- **API Uç Noktaları**: `GET /auth/workspace/state` son kaydı döndürür, `POST /auth/workspace/state` güncel düzeni kaydeder.
+- **Kullanım Akışı**: Kullanıcı giriş yaptıktan sonra state GET isteği ile alınır; node pozisyonu veya tema değiştikçe debounced POST isteği ile güncel layout gönderilir.
+- **Sunucu Yanıtı**: JSON alanları `layout_json`, `matrix_json`, `theme`, `updated_at` değerlerini içerir; kayıt yoksa boş `{}` layout'u döner.
+- **Güvenlik**: İstekler JWT ile yetkilendirilir, backend büyük JSON verilerini sınırlandırır ve kötü amaçlı içerikleri reddeder.
+- **Frontend**: Giriş yapmış kullanıcılar `⚙️ Ayarlar` menüsünü açıp `💾 Düzeni Kaydet` butonu ile mevcut node yerleşimini manuel olarak kaydedebilir; sayfa yenilendiğinde kayıtlı düzen otomatik yüklenir.
+
 ---
 
 ## 🏗️ Modüler Mimari

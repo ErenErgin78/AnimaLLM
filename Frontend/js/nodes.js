@@ -3,6 +3,11 @@
  * Sürüklenebilir node'lar, wire bağlantıları ve fizik simülasyonu
  */
 
+// Global işaretler
+window.__nodesInitialized = window.__nodesInitialized || false;
+window.__workspaceStateLoaded = window.__workspaceStateLoaded || false;
+window.__workspaceStateLoading = window.__workspaceStateLoading || false;
+
 // Draggable node'ların konfigürasyonu
 const DRAGGABLES = [
     // Parent hub'lar
@@ -387,6 +392,8 @@ function initDraggables() {
         updateRopesImmediate();
         requestAnimationFrame(stepRopes);
     });
+
+    window.__nodesInitialized = true;
 }
 
 /**
@@ -941,6 +948,223 @@ function constrainAllNodes() {
     } catch (e) {
         // Hata olsa da sessizce devam et
         console.error('constrainAllNodes error:', e);
+    }
+}
+
+/**
+ * Çalışma alanı yerleşimini toplar
+ * @returns {{nodes: Array, groups: Object, flowerMode: boolean}}
+ */
+function collectWorkspaceLayout() {
+    const nodeItems = [];
+    document.querySelectorAll('.func-node').forEach(node => {
+        const styleLeft = parseFloat(node.style.left);
+        const styleTop = parseFloat(node.style.top);
+        const rect = node.getBoundingClientRect();
+        nodeItems.push({
+            id: node.id,
+            left: Number.isFinite(styleLeft) ? styleLeft : rect.left,
+            top: Number.isFinite(styleTop) ? styleTop : rect.top,
+            collapsed: node.classList.contains('collapsed'),
+            side: node.dataset.side || null
+        });
+    });
+    const groupStates = {};
+    Object.keys(GROUPS || {}).forEach(key => {
+        groupStates[key] = !!(GROUPS[key] && GROUPS[key].open);
+    });
+    return {
+        nodes: nodeItems,
+        groups: groupStates,
+        flowerMode: !!window.__flowerMode
+    };
+}
+
+/**
+ * Çalışma alanı yerleşimini uygular
+ * @param {Object} layout - Kaydedilmiş yerleşim verisi
+ */
+function applyWorkspaceLayout(layout) {
+    if (!layout || typeof layout !== 'object') return;
+
+    if (layout.groups && typeof layout.groups === 'object') {
+        Object.keys(layout.groups).forEach(key => {
+            if (GROUPS[key] && GROUPS[key].open !== layout.groups[key]) {
+                setCollapsedState(key, !!layout.groups[key]);
+            }
+        });
+    }
+
+    if (Array.isArray(layout.nodes)) {
+        layout.nodes.forEach(item => {
+            const el = document.getElementById(item.id);
+            if (!el) return;
+
+            if (typeof item.collapsed === 'boolean') {
+                if (item.collapsed) {
+                    el.classList.add('collapsed');
+                } else {
+                    el.classList.remove('collapsed');
+                }
+            }
+
+            const leftVal = parseFloat(item.left);
+            const topVal = parseFloat(item.top);
+            if (Number.isFinite(leftVal)) {
+                el.style.left = leftVal + 'px';
+                el.style.right = 'auto';
+            }
+            if (Number.isFinite(topVal)) {
+                el.style.top = topVal + 'px';
+            }
+        });
+    }
+
+    if (typeof layout.flowerMode === 'boolean' && layout.flowerMode !== !!window.__flowerMode) {
+        toggleFlowerMode();
+    }
+
+    if (typeof updateRopesImmediate === 'function') {
+        updateRopesImmediate();
+        requestAnimationFrame(stepRopes);
+    }
+}
+
+/**
+ * Çalışma alanı meta verilerini toplar
+ * @returns {{matrixEnabled: boolean}}
+ */
+function collectWorkspaceMeta() {
+    return {
+        matrixEnabled: (typeof matrixEnabled === 'boolean') ? matrixEnabled : true
+    };
+}
+
+/**
+ * Çalışma alanı meta verisini uygular
+ * @param {Object} meta - Kaydedilmiş meta verisi
+ */
+function applyWorkspaceMeta(meta) {
+    if (!meta || typeof meta !== 'object') return;
+    if (Object.prototype.hasOwnProperty.call(meta, 'matrixEnabled') && typeof meta.matrixEnabled === 'boolean') {
+        if (typeof matrixEnabled === 'boolean' && matrixEnabled !== meta.matrixEnabled) {
+            toggleMatrix();
+        }
+    }
+}
+
+/**
+ * Çalışma alanı durumunu sunucuya kaydeder
+ */
+async function saveWorkspaceState() {
+    const btn = document.getElementById('workspace-save-btn');
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        if (btn) {
+            const original = btn.textContent;
+            btn.textContent = '⚠ Giriş gerekir';
+            setTimeout(() => { btn.textContent = original; }, 1500);
+        }
+        return;
+    }
+
+    const layout = collectWorkspaceLayout();
+    const meta = collectWorkspaceMeta();
+    const themeName = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+
+    try {
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Kaydediliyor...';
+        }
+        const response = await fetch('/auth/workspace/state', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                layout_json: JSON.stringify(layout),
+                matrix_json: JSON.stringify(meta),
+                theme: themeName
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Kaydetme hatası: ${response.status}`);
+        }
+
+        window.__workspaceStateLoaded = true;
+        if (btn) {
+            btn.textContent = '✅ Kaydedildi';
+        }
+    } catch (error) {
+        console.error('Workspace kaydetme hatası:', error);
+        if (btn) {
+            btn.textContent = '❌ Hata';
+        }
+    } finally {
+        if (btn) {
+            setTimeout(() => {
+                btn.textContent = '💾 Kaydet';
+                btn.disabled = false;
+            }, 1600);
+        }
+    }
+}
+
+/**
+ * Sunucudan çalışma alanı durumunu yükler
+ */
+async function loadWorkspaceState() {
+    if (window.__workspaceStateLoading || window.__workspaceStateLoaded) return;
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    if (!window.__nodesInitialized) {
+        setTimeout(loadWorkspaceState, 300);
+        return;
+    }
+
+    window.__workspaceStateLoading = true;
+    try {
+        const response = await fetch('/auth/workspace/state', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`Yükleme hatası: ${response.status}`);
+        }
+        const data = await response.json();
+
+        if (data.theme && typeof applyTheme === 'function') {
+            applyTheme(data.theme);
+        }
+
+        if (data.layout_json) {
+            try {
+                const layout = JSON.parse(data.layout_json);
+                applyWorkspaceLayout(layout);
+            } catch (e) {
+                console.error('Yerleşim verisi parse hatası:', e);
+            }
+        }
+
+        if (data.matrix_json) {
+            try {
+                const meta = JSON.parse(data.matrix_json);
+                applyWorkspaceMeta(meta);
+            } catch (e) {
+                console.error('Matrix verisi parse hatası:', e);
+            }
+        }
+
+        window.__workspaceStateLoaded = true;
+    } catch (error) {
+        console.error('Workspace yükleme hatası:', error);
+    } finally {
+        window.__workspaceStateLoading = false;
     }
 }
 

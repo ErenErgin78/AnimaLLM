@@ -10,7 +10,7 @@ from Auth.schemas import (
     UserRegister, UserLogin, UserResponse, TokenResponse,
     ChatHistoryCreate, ChatHistoryResponse, ChatHistoryListResponse,
     ConversationCreate, ConversationResponse, ConversationListResponse,
-    ConversationMessagesResponse
+    ConversationMessagesResponse, WorkspaceStateRequest, WorkspaceStateResponse
 )
 from Auth.auth_service import create_user, authenticate_user, create_access_token
 from Auth.dependencies import get_current_user
@@ -20,6 +20,8 @@ from Auth.conversation_service import (
     get_conversation_messages, add_message_to_conversation,
     delete_conversation, update_conversation_title
 )
+from Auth.workspace_service import get_workspace_state, upsert_workspace_state
+from datetime import datetime, timezone
 
 # Router oluştur - tüm auth endpoint'leri burada
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -396,6 +398,52 @@ def get_conversations_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Conversation listesi getirilemedi"
         )
+
+
+@router.get("/workspace/state", response_model=WorkspaceStateResponse, status_code=status.HTTP_200_OK)
+def get_workspace_state_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Kullanıcının son kaydettiği çalışma alanı durumunu döndürür"""
+    # Kayıt varsa doğrudan döndür, yoksa varsayılan boş ayar yolla
+    state = get_workspace_state(db, current_user.id)
+    if state:
+        return WorkspaceStateResponse(
+            layout_json=state.layout_json,
+            matrix_json=state.matrix_json,
+            theme=state.theme,
+            updated_at=state.updated_at
+        )
+    now = datetime.now(timezone.utc)
+    return WorkspaceStateResponse(
+        layout_json="{}",
+        matrix_json=None,
+        theme=None,
+        updated_at=now
+    )
+
+
+@router.post("/workspace/state", response_model=WorkspaceStateResponse, status_code=status.HTTP_200_OK)
+def upsert_workspace_state_endpoint(
+    payload: WorkspaceStateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Kullanıcının çalışma alanı ayarını kaydeder"""
+    state = upsert_workspace_state(
+        db=db,
+        user_id=current_user.id,
+        layout_json=payload.layout_json,
+        matrix_json=payload.matrix_json,
+        theme=payload.theme
+    )
+    return WorkspaceStateResponse(
+        layout_json=state.layout_json,
+        matrix_json=state.matrix_json,
+        theme=state.theme,
+        updated_at=state.updated_at
+    )
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=ConversationMessagesResponse)

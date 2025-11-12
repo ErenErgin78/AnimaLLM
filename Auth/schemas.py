@@ -311,3 +311,71 @@ class ConversationMessagesResponse(BaseModel):
     
     conversation: ConversationResponse = Field(..., description="Conversation bilgileri")
     messages: List[ChatHistoryResponse] = Field(..., description="Mesaj listesi")
+
+
+class WorkspaceStateRequest(BaseModel):
+    """
+    Çalışma alanı durumu kaydetme isteği - node pozisyonlarını, bağlantı matrisini ve temayı içerir
+    """
+
+    layout_json: str = Field(..., min_length=2, description="Node yerleşimlerinin JSON metni")
+    matrix_json: Optional[str] = Field(None, description="Bağlantı matrisi JSON metni")
+    theme: Optional[str] = Field(None, max_length=100, description="Tema kimliği")
+
+    @field_validator("layout_json")
+    @classmethod
+    def validate_layout(cls, v: str) -> str:
+        """Yerleşim metninin güvenli olduğunu doğrula"""
+        dangerous = ['<script', 'javascript:', 'vbscript:', 'data:text/html']
+        lower_v = v.lower()
+        for item in dangerous:
+            if item in lower_v:
+                raise ValueError("Yerleşim verisi güvenlik nedeniyle reddedildi")
+        if len(v) > 200000:
+            raise ValueError("Yerleşim verisi çok büyük")
+        return v.strip()
+
+    @field_validator("matrix_json")
+    @classmethod
+    def validate_matrix(cls, v: Optional[str]) -> Optional[str]:
+        """Matris metninin güvenli olduğunu doğrula"""
+        if not v:
+            return v
+        lower_v = v.lower()
+        dangerous = ['<script', 'javascript:', 'vbscript:', 'data:text/html']
+        for item in dangerous:
+            if item in lower_v:
+                raise ValueError("Matris verisi güvenlik nedeniyle reddedildi")
+        if len(v) > 200000:
+            raise ValueError("Matris verisi çok büyük")
+        return v.strip()
+
+    @field_validator("theme")
+    @classmethod
+    def validate_theme(cls, v: Optional[str]) -> Optional[str]:
+        """Tema değerini güvenli hale getir"""
+        if v is None:
+            return v
+        cleaned = v.strip()
+        if not cleaned:
+            return None
+        dangerous_chars = ['<', '>', '"', "'", ';', '--', '/', '\\']
+        for char in dangerous_chars:
+            if char in cleaned:
+                raise ValueError("Tema değeri güvenlik nedeniyle reddedildi")
+        return cleaned[:100]
+
+
+class WorkspaceStateResponse(BaseModel):
+    """
+    Çalışma alanı durumu yanıtı - kullanıcıya son kaydettiği ayarları döndürür
+    """
+
+    layout_json: str = Field(..., description="Node yerleşimlerinin JSON metni")
+    matrix_json: Optional[str] = Field(None, description="Bağlantı matrisi JSON metni")
+    theme: Optional[str] = Field(None, description="Tema kimliği")
+    updated_at: datetime = Field(..., description="Son güncelleme zamanı")
+
+    class Config:
+        """ORM nesnelerini Pydantic'e dönüştür"""
+        from_attributes = True

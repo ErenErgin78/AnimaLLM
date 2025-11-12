@@ -43,10 +43,14 @@
     
     <!-- Sol alt aksiyon butonları -->
     <div class="bottom-left-actions">
-        <button class="action-btn" onclick="toggleTheme()">🌗 Tema</button>
-        <button class="action-btn" onclick="toggleMatrix()">🧪 Matrix</button>
-        <button class="action-btn" onclick="toggleFlowerMode()">🌸 Flower</button>
-        <button class="action-btn" id="history-toggle-btn" onclick="toggleChatHistory()" style="display: none;">📜 Geçmiş</button>
+        <button class="action-btn" id="settings-toggle-btn" onclick="toggleSettingsPanel()">⚙️ Ayarlar</button>
+        <div id="settings-panel" class="settings-panel">
+            <button class="action-btn settings-item" onclick="toggleTheme()">🌗 Tema</button>
+            <button class="action-btn settings-item" onclick="toggleMatrix()">🧪 Matrix</button>
+            <button class="action-btn settings-item" onclick="toggleFlowerMode()">🌸 Flower</button>
+            <button class="action-btn settings-item" id="workspace-save-btn" onclick="saveWorkspaceState()" style="display: none;" title="Sürüklenmiş node yerleşimini kaydeder">💾 Düzeni Kaydet</button>
+            <button class="action-btn settings-item" id="history-toggle-btn" onclick="toggleChatHistory()" style="display: none;">📜 Geçmiş</button>
+        </div>
     </div>
     
     <!-- Sohbet Geçmişi Paneli - Açılır/Kapanır -->

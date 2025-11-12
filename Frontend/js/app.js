@@ -3,6 +3,9 @@
  * Tüm modülleri başlatır ve event listener'ları ayarlar
  */
 
+// Ayarlar panelinin açık/kapalı durumunu takip eden bayrak
+let settingsPanelOpen = false;
+
 // Window resize event'leri
 window.addEventListener('resize', () => {
     // Emoji boyutlandır (varsa)
@@ -47,6 +50,7 @@ function checkUserStatus() {
     const authButtons = document.getElementById('auth-buttons');
     const userInfo = document.getElementById('user-info');
     const userDisplay = document.getElementById('user-display');
+    const workspaceBtn = document.getElementById('workspace-save-btn');
     
     if (token && userStr) {
         try {
@@ -59,17 +63,25 @@ function checkUserStatus() {
                 const displayName = user.name || user.username || user.email;
                 userDisplay.textContent = displayName;
             }
+            if (workspaceBtn) workspaceBtn.style.display = 'inline-flex';
+            if (typeof loadWorkspaceState === 'function' && !window.__workspaceStateLoaded) {
+                loadWorkspaceState();
+            }
         } catch (e) {
             // JSON parse hatası
             localStorage.removeItem('access_token');
             localStorage.removeItem('user');
             if (authButtons) authButtons.style.display = 'flex';
             if (userInfo) userInfo.style.display = 'none';
+            if (workspaceBtn) workspaceBtn.style.display = 'none';
+            toggleSettingsPanel(false);
         }
     } else {
         // Giriş yapılmamış
         if (authButtons) authButtons.style.display = 'flex';
         if (userInfo) userInfo.style.display = 'none';
+        if (workspaceBtn) workspaceBtn.style.display = 'none';
+        toggleSettingsPanel(false);
     }
     
     // Sohbet geçmişi butonunu güncelle (varsa)
@@ -134,6 +146,44 @@ window.addEventListener('load', () => {
     // Sohbet geçmişi butonunu güncelle (varsa)
     if (typeof updateHistoryButtonVisibility === 'function') {
         updateHistoryButtonVisibility();
+    }
+});
+
+/**
+ * Ayarlar panelini açıp kapatan fonksiyon
+ * Kullanıcının butona basmasına göre panel animasyonunu yönetir
+ */
+function toggleSettingsPanel(forceState) {
+    const nextState = typeof forceState === 'boolean' ? forceState : !settingsPanelOpen;
+    settingsPanelOpen = nextState;
+
+    const panel = document.getElementById('settings-panel');
+    const toggleBtn = document.getElementById('settings-toggle-btn');
+    if (!panel || !toggleBtn) return;
+
+    if (nextState) {
+        panel.classList.add('open');
+        toggleBtn.classList.add('active');
+    } else {
+        panel.classList.remove('open');
+        toggleBtn.classList.remove('active');
+    }
+}
+
+// Panel dışına tıklanınca kapatmak için global dinleyici
+document.addEventListener('click', (event) => {
+    if (!settingsPanelOpen) return;
+    const panel = document.getElementById('settings-panel');
+    const toggleBtn = document.getElementById('settings-toggle-btn');
+    if (!panel || !toggleBtn) return;
+    if (panel.contains(event.target) || toggleBtn.contains(event.target)) return;
+    toggleSettingsPanel(false);
+});
+
+// Klavyeden Escape basıldığında paneli gizle
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        toggleSettingsPanel(false);
     }
 });
 
