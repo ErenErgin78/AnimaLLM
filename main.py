@@ -1,92 +1,82 @@
-"""
-CHAIN SYSTEM - Ana Chatbot Sistemi
-==================================
-
-Bu dosya LangChain chain yapısı ile tüm sistemleri koordine eder.
-- Chain-based akış yönlendirmesi
-- RAG, Animal, Emotion sistemlerini chain olarak çağırma
-- Web arayüzü yönetimi
-"""
+"""Ana Chatbot Sistemi - LangChain chain yapısı ile sistem koordinasyonu"""
 
 import os
 import re
 import html
+import asyncio
+import json
+import time
+import warnings
+import logging
+import traceback
 from typing import Any, Dict
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Header, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-import json
-from pathlib import Path
 from dotenv import load_dotenv
 
-# LangChain imports
 from langchain_openai import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.schema import BaseOutputParser
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Sistem modüllerini import et (Tools klasöründen)
+import google.generativeai as genai
+import torch
+from transformers import pipeline
+from openai import OpenAI as OpenAIClient
+
 from Tools.emotion_system import EmotionChatbot
 from Tools.statistic_system import StatisticSystem
 from Tools.animal_system import route_animals, _animal_emoji
 from Tools.rag_service import rag_service
 
-# Auth modüllerini import et
 from Auth.routes import router as auth_router
 from Auth.database import init_db, get_db
+from Auth.auth_service import verify_token
 from Auth.conversation_service import (
     create_conversation, get_conversation_by_id,
     add_message_to_conversation, update_conversation_title
 )
 from Auth.models import User
 
+import uvicorn
+
 load_dotenv()
 
 app = FastAPI(title="CHAIN SYSTEM - Akıllı Chatbot Sistemi", version="3.0.0")
 
-# Auth router'ını ekle
 app.include_router(auth_router)
 
-# Veritabanını başlat - uygulama başlangıcında tabloları oluştur
 try:
     init_db()
 except Exception as e:
     print(f"[MAIN ERROR] Veritabanı başlatma hatası: {e}")
 
-# LangChain LLM instance - Fallback mekanizması ile
 def get_llm():
-    """OpenAI API geçersizse Gemini'yi kullan"""
-    import warnings
-    import logging
-    
-    # Uyarıları bastır
+    """LLM instance oluşturur - OpenAI veya Gemini"""
     warnings.filterwarnings("ignore")
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # TensorFlow uyarılarını bastır
-    os.environ['GRPC_VERBOSITY'] = 'ERROR'  # gRPC uyarılarını bastır
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['GRPC_VERBOSITY'] = 'ERROR'
     logging.getLogger("transformers").setLevel(logging.ERROR)
     logging.getLogger("google").setLevel(logging.ERROR)
     logging.getLogger("google.api_core").setLevel(logging.ERROR)
     logging.getLogger("absl").setLevel(logging.ERROR)
     
     try:
-        # OpenAI API'yi test et
         test_llm = OpenAI(temperature=0.1, max_tokens=1000, request_timeout=15)
-        # Basit bir test çağrısı yap
         test_llm.invoke("test")
         print("[LLM] OpenAI API kullanılıyor")
         return test_llm
     except Exception:
-        # OpenAI API key kullanılamıyor
         print("[LLM] OpenAI API key kullanılamıyor")
         try:
-            # Gemini API'yi test et - sadece API key ile
-            import google.generativeai as genai
             api_key = os.getenv("GEMINI_API_KEY")
             if not api_key:
                 raise Exception("GEMINI_API_KEY bulunamadı")
             genai.configure(api_key=api_key)
             
-            # LangChain wrapper oluştur - Google Cloud credentials olmadan
-            from langchain_google_genai import ChatGoogleGenerativeAI
             gemini_llm = ChatGoogleGenerativeAI(
                 model="gemini-2.5-flash",
                 temperature=0.1,
@@ -102,12 +92,8 @@ def get_llm():
 
 llm = get_llm()
 
-# Global chatbot instance
 chatbot_instance: EmotionChatbot | None = None
 
-# =============================================================================
-# CONVERSATION HELPER - ChatGPT Tarzı Sohbet Oturumu Yönetimi
-# =============================================================================
 def save_message_to_conversation(
     user_id: int | None,
     conversation_id: int | None,
@@ -115,35 +101,18 @@ def save_message_to_conversation(
     bot_response: str,
     flow_type: str | None = None
 ) -> int | None:
-    """
-    Mesajı conversation'a kaydeder (yeni conversation oluşturur veya mevcut conversation'a ekler)
-    
-    Args:
-        user_id: Kullanıcı ID'si (None ise kaydetme)
-        conversation_id: Conversation ID'si (None ise yeni conversation oluştur)
-        user_message: Kullanıcı mesajı
-        bot_response: Bot yanıtı
-        flow_type: Akış tipi (RAG, ANIMAL, EMOTION, STATS, HELP)
-    
-    Returns:
-        int | None: Conversation ID'si veya None
-    """
+    """Mesajı conversation'a kaydeder"""
     if user_id is None:
-        # Kullanıcı giriş yapmamış, kaydetme
         return None
     
     try:
-        # Veritabanı session'ı al
         db = next(get_db())
         try:
-            # Conversation ID yoksa yeni conversation oluştur
             if conversation_id is None:
-                # İlk mesajdan başlık oluştur (maksimum 50 karakter)
                 title = user_message[:50].strip()
                 if not title:
                     title = "Yeni Sohbet"
                 
-                # Yeni conversation oluştur
                 new_conversation = create_conversation(
                     db=db,
                     user_id=user_id,
@@ -152,10 +121,8 @@ def save_message_to_conversation(
                 conversation_id = new_conversation.id
                 print(f"[CONVERSATION] Yeni conversation oluşturuldu: conversation_id={conversation_id}, title='{title}'")
             else:
-                # Mevcut conversation'ı kontrol et
                 existing_conv = get_conversation_by_id(db, conversation_id, user_id)
                 if not existing_conv:
-                    # Conversation bulunamadı, yeni oluştur
                     title = user_message[:50].strip()
                     if not title:
                         title = "Yeni Sohbet"
@@ -167,7 +134,6 @@ def save_message_to_conversation(
                     conversation_id = new_conversation.id
                     print(f"[CONVERSATION] Conversation bulunamadı, yeni oluşturuldu: conversation_id={conversation_id}")
             
-            # Conversation'a mesaj ekle
             add_message_to_conversation(
                 db=db,
                 conversation_id=conversation_id,
@@ -180,29 +146,18 @@ def save_message_to_conversation(
             
             return conversation_id
         finally:
-            # Session'ı kapat
             db.close()
     except Exception as e:
-        # Hata durumunda sessizce devam et (sohbet akışını bozmamak için)
         print(f"[CONVERSATION ERROR] Mesaj kaydedilemedi: {e}")
         return None
 
 
 def get_current_user_id_optional(authorization: str | None = None) -> int | None:
-    """
-    JWT token'dan kullanıcı ID'sini alır (opsiyonel - token yoksa None döner)
-    
-    Args:
-        authorization: Authorization header değeri (Bearer token)
-    
-    Returns:
-        int | None: Kullanıcı ID'si veya None
-    """
+    """JWT token'dan kullanıcı ID'sini alır"""
     if not authorization:
         return None
     
     try:
-        # Bearer token'ı çıkar
         if not authorization.startswith("Bearer "):
             return None
         
@@ -210,53 +165,37 @@ def get_current_user_id_optional(authorization: str | None = None) -> int | None
         if not token:
             return None
         
-        # Token'ı doğrula
-        from Auth.auth_service import verify_token
         payload = verify_token(token)
         if payload is None:
             return None
         
-        # User ID'yi al - JWT standardına göre string olarak gelir
         user_id_str = payload.get("sub")
         if user_id_str is None:
             return None
         
-        # String'den integer'a çevir
         try:
             return int(user_id_str)
         except (ValueError, TypeError):
             return None
     except Exception:
-        # Hata durumunda None döndür
         return None
 
-# =============================================================================
-# ÖZETLEYİCİ (SUMMARIZER) - Uzun kullanıcı mesajlarını kısaltmak için
-# =============================================================================
-# T5-small ile transformers pipeline kullanılır. Lazy-init yapılır ve tek instance
-# tutulur. Kullanıcı mesajı yaklaşık 200 token'i aşarsa tetiklenir.
-_summarizer_pipeline = None  # Lazy init: ilk kullanımda yüklenir
+_summarizer_pipeline = None
 
 def _get_device_id() -> int:
-    """Transformers pipeline için cihaz kimliğini döndürür.
-    - CUDA (GPU) mevcutsa 0, değilse -1 (CPU)
-    """
+    """GPU/CPU cihaz ID'sini döndürür"""
     try:
-        import torch  # Yerinde import: bağımlılık yoksa hata kontrollü yakalanır
         return 0 if getattr(torch, "cuda", None) and torch.cuda.is_available() else -1
     except Exception:
-        # Torch yoksa CPU kullan
         return -1
 
 
 def _get_summarizer():
-    """T5-small summarization pipeline'ını döndürür (lazy-init)."""
+    """T5-small summarization pipeline'ını döndürür"""
     global _summarizer_pipeline
     if _summarizer_pipeline is not None:
         return _summarizer_pipeline
     try:
-        # Transformers'ı sadece gerektiğinde yükle
-        from transformers import pipeline  # type: ignore
         device_id = _get_device_id()
         _summarizer_pipeline = pipeline(
             "summarization",
@@ -265,19 +204,12 @@ def _get_summarizer():
         )
         return _summarizer_pipeline
     except Exception as e:
-        # Özetleyici yüklenemezse None döndür ve akışı engelleme
         print(f"[SUMMARIZER] Yükleme hatası: {e}")
         return None
 
 
 def _summarize_text_if_needed(text: str, estimated_tokens: int, token_threshold: int = 200) -> str:
-    """Mesaj token tahmini eşik değerini aşıyorsa metni kısaltır.
-
-    Güvenlik/sağlamlık notları:
-    - Transformers bağımlılığı yoksa veya model yüklenemezse orijinal metni döndürür
-    - T5 için "summarize:" prefix'i kullanılır; Türkçe girişlerde de çalışır
-    - max_new_tokens/min_new_tokens, girdinin uzunluğuna göre ölçeklenir
-    """
+    """Token eşiğini aşan metni kısaltır"""
     try:
         if estimated_tokens <= token_threshold:
             return text
@@ -286,17 +218,13 @@ def _summarize_text_if_needed(text: str, estimated_tokens: int, token_threshold:
         if summarizer is None:
             return text
 
-        # T5 özetleme: İngilizce ön-ek; Türkçe için de kabul edilebilir
         prefixed = "summarize: " + text
 
-        # Tokenizer varsa giriş uzunluğuna göre dinamik ayar yap
         try:
-            input_len = len(summarizer.tokenizer(prefixed)["input_ids"])  # type: ignore[attr-defined]
+            input_len = len(summarizer.tokenizer(prefixed)["input_ids"])
         except Exception:
-            # Tokenizer'a erişilemezse kaba tahmin ile çalış
             input_len = max(60, len(prefixed) // 4)
 
-        # Çıkış uzunluğu: girişin ~%30-50'si; alt/üst sınırlar güvenlik için
         new_tokens = max(32, min(160, int(input_len * 0.4)))
         min_new = max(16, int(new_tokens * 0.4))
 
@@ -312,51 +240,42 @@ def _summarize_text_if_needed(text: str, estimated_tokens: int, token_threshold:
         except Exception:
             summary = ""
 
-        # Boş dönerse orijinal metni koru
         if not summary:
             return text
 
-        # Konsola kısaltılmış çıktıyı yaz (istenen gereksinim)
         print(f"[SUMMARIZER] Kısaltılmış metin: {summary}")
         return summary
     except Exception as e:
-        # Her türlü hata durumunda orijinal metni döndür
         print(f"[SUMMARIZER] Çalışma hatası: {e}")
         return text
 
-# RAG modelini asenkron olarak önceden yükle
 rag_service.preload_model_async()
 
-# LoRA yüklemesi için EmotionChatbot instance'ı oluştur (client=None, Gemini kullanacak)
-# Chat için lazım olana kadar beklenmez, sadece LoRA yüklemesi için
 if chatbot_instance is None:
-    chatbot_instance = EmotionChatbot()  # client=None, Gemini kullanacak
+    chatbot_instance = EmotionChatbot()
 chatbot_instance.preload_lora_model_async()
 
-# Güvenlik sabitleri
-MAX_MESSAGE_LENGTH = 2000  # Maksimum mesaj uzunluğu
-MAX_TOKENS_PER_REQUEST = 1000  # Maksimum token sayısı
+MAX_MESSAGE_LENGTH = 2000
+MAX_TOKENS_PER_REQUEST = 1000
 DANGEROUS_PATTERNS = [
-    r'<script[^>]*>.*?</script>',  # Script injection
-    r'javascript:',  # JavaScript URL
-    r'data:text/html',  # Data URL
-    r'vbscript:',  # VBScript
-    r'on\w+\s*=',  # Event handlers
-    r'<iframe[^>]*>',  # Iframe injection
-    r'<object[^>]*>',  # Object injection
-    r'<embed[^>]*>',  # Embed injection
-    r'<link[^>]*>',  # Link injection
-    r'<meta[^>]*>',  # Meta injection
+    r'<script[^>]*>.*?</script>',
+    r'javascript:',
+    r'data:text/html',
+    r'vbscript:',
+    r'on\w+\s*=',
+    r'<iframe[^>]*>',
+    r'<object[^>]*>',
+    r'<embed[^>]*>',
+    r'<link[^>]*>',
+    r'<meta[^>]*>',
 ]
 
-# RAG kaynakları (UI id'leri sabit: pdf-python/anayasa/clean)
 RAG_SOURCES = {
     "cat_care.pdf": {"id": "pdf-python", "emoji": "🐱", "alias": "cat"},
     "parrot_care.pdf": {"id": "pdf-anayasa", "emoji": "🦜", "alias": "parrot"},
     "rabbit_care.pdf": {"id": "pdf-clean", "emoji": "🐰", "alias": "rabbit"},
 }
 
-# Static files (CSS/JS) - Frontend dizinine taşındı
 STATIC_DIR = Path(__file__).parent / "Frontend"
 try:
     STATIC_DIR.mkdir(parents=True, exist_ok=True)
@@ -366,10 +285,10 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 class FlowDecisionParser(BaseOutputParser):
-    """Akış kararı parser'ı - LLM çıktısını temizler"""
+    """LLM çıktısını akış kararına çevirir"""
     
     def parse(self, text: str) -> str:
-        """LLM çıktısını temizleyip akış kararını döndürür"""
+        """LLM çıktısını parse eder"""
         text = text.strip().upper()
         valid_flows = ["ANIMAL", "RAG", "EMOTION", "STATS", "HELP"]
         
@@ -377,24 +296,21 @@ class FlowDecisionParser(BaseOutputParser):
             if flow in text:
                 return flow
         
-        return "HELP"  # Varsayılan fallback - yardım mesajı
+        return "HELP"
 
 
 def _sanitize_input(text: str) -> str:
-    """Güvenli input sanitization - injection saldırılarını önler"""
+    """Input sanitization"""
     if not text:
         return ""
     
-    # HTML escape
     text = html.escape(text, quote=True)
     
-    # Tehlikeli pattern'leri kontrol et
     for pattern in DANGEROUS_PATTERNS:
         if re.search(pattern, text, re.IGNORECASE):
             print(f"[SECURITY] Tehlikeli pattern tespit edildi: {pattern}")
             return "[Güvenlik nedeniyle mesaj filtrelendi]"
     
-    # Fazla boşlukları temizle
     text = re.sub(r'\s+', ' ', text).strip()
     
     return text
@@ -406,14 +322,9 @@ def _validate_message_length(text: str) -> bool:
 
 
 def _estimate_tokens(text: str) -> int:
-    """Yaklaşık token sayısını hesaplar (Türkçe için)"""
-    # Türkçe için yaklaşık hesaplama: 1 token ≈ 4 karakter
+    """Token sayısını tahmin eder"""
     return len(text) // 4
 
-
-# =============================================================================
-# CHAIN SYSTEM - LangChain Chain Yapıları
-# =============================================================================
 
 def create_flow_decision_chain():
     """Akış kararı chain'i oluşturur"""
@@ -447,62 +358,42 @@ def create_flow_decision_chain():
         Sadece şu yanıtlardan birini ver: ANIMAL, RAG, EMOTION, STATS, HELP"""
     )
     
-    def flow_processor(input_data):
-        """Flow decision işleyicisi - Gemini ve OpenAI çıktılarını normalize eder"""
+    async def flow_processor(input_data):
+        """Flow decision işleyicisi"""
         try:
             print(f"[FLOW DEBUG] Input data: {input_data}")
-            print(f"[FLOW DEBUG] LLM çağrısı başlatılıyor...")
+            print(f"[FLOW DEBUG] LLM çağrısı başlatılıyor (async)...")
             
-            # Timeout ile LLM çağrısı yap
-            import threading
-            
-            # Thread-safe sonuç saklama
-            result_container = {'result': None, 'error': None}
-            
-            def call_llm():
-                try:
-                    result_container['result'] = (flow_prompt | llm).invoke(input_data)
-                except Exception as e:
-                    result_container['error'] = str(e)
-            
-            # Thread ile çağrı yap ve timeout kontrolü
-            thread = threading.Thread(target=call_llm)
-            thread.daemon = True
-            thread.start()
-            thread.join(timeout=30)  # 30 saniye timeout
-            
-            if thread.is_alive():
+            try:
+                chain = flow_prompt | llm
+                result = await asyncio.wait_for(
+                    chain.ainvoke(input_data),
+                    timeout=30.0
+                )
+            except asyncio.TimeoutError:
                 print("[FLOW ERROR] LLM çağrısı timeout oldu (30 saniye)")
-                return "HELP"  # Timeout durumunda HELP döndür
+                return "HELP"
+            except Exception as e:
+                print(f"[FLOW ERROR] LLM çağrısı hatası: {e}")
+                return "HELP"
             
-            if result_container['error']:
-                print(f"[FLOW ERROR] LLM çağrısı hatası: {result_container['error']}")
-                return "HELP"  # Hata durumunda HELP döndür
-            
-            result = result_container['result']
             if result is None:
                 print("[FLOW ERROR] LLM çağrısı None döndü")
                 return "HELP"
             
-            # Ham cevabı konsola yazdır
             print(f"[FLOW DEBUG] Ham result tipi: {type(result)}")
             print(f"[FLOW DEBUG] Ham result: {result}")
             
-            # Gemini ve OpenAI çıktılarını normalize et
             if hasattr(result, 'content'):
-                # LangChain response objesi
                 text = result.content
                 print(f"[FLOW DEBUG] Content: {text}")
             elif isinstance(result, str):
-                # String çıktı
                 text = result
                 print(f"[FLOW DEBUG] String: {text}")
             else:
-                # Diğer durumlar için string'e çevir
                 text = str(result)
                 print(f"[FLOW DEBUG] String'e çevriliyor: {text}")
             
-            # FlowDecisionParser'ı kullan
             parser = FlowDecisionParser()
             parsed_result = parser.parse(text)
             print(f"[FLOW DEBUG] Parsed result: {parsed_result}")
@@ -510,15 +401,14 @@ def create_flow_decision_chain():
             
         except Exception as e:
             print(f"[FLOW ERROR] Beklenmeyen hata: {e}")
-            import traceback
             traceback.print_exc()
-            return "HELP"  # Hata durumunda HELP döndür
+            return "HELP"
     
     return flow_processor
 
 
 def create_rag_chain():
-    """RAG chain'i oluşturur - Streaming desteği ile"""
+    """RAG chain'i oluşturur"""
     rag_prompt = PromptTemplate(
         input_variables=["input"],
         template="""Sen bir hayvan bakımı bilgi asistanısın. Verilen kullanıcı mesajını kullanarak kullanıcının sorusunu yanıtla. 
@@ -528,26 +418,21 @@ def create_rag_chain():
         Kullanıcı Mesajı: {input}"""
     )
     
-    def rag_processor(input_data, stream: bool = False):
-        """RAG işleyicisi - Gemini ve OpenAI çıktılarını normalize eder, streaming desteği ile"""
+    async def rag_processor(input_data, stream: bool = False):
+        """RAG işleyicisi"""
         try:       
             if stream:
-                # Streaming modu - Gemini streaming kullan
-                print(f"[RAG DEBUG] Streaming modu aktif, LLM çağrısı başlatılıyor...")
+                print(f"[RAG DEBUG] Streaming modu aktif, LLM çağrısı başlatılıyor (async)...")
                 
-                # Gemini streaming için doğrudan API kullan
                 try:
-                    import google.generativeai as genai
                     api_key = os.getenv("GEMINI_API_KEY")
                     if api_key:
                         genai.configure(api_key=api_key)
                         model = genai.GenerativeModel('gemini-2.5-flash')
                         
-                        # Prompt'u hazırla
                         formatted_prompt = rag_prompt.format(**input_data)
                         
-                        # Streaming response üretici
-                        def generate_stream():
+                        async def generate_stream():
                             try:
                                 response = model.generate_content(
                                     formatted_prompt,
@@ -557,6 +442,7 @@ def create_rag_chain():
                                 for chunk in response:
                                     if chunk.text:
                                         yield chunk.text
+                                    await asyncio.sleep(0)
                             except Exception as e:
                                 print(f"[RAG ERROR] Streaming hatası: {e}")
                                 yield f"RAG sistemi hatası: {str(e)}"
@@ -564,64 +450,42 @@ def create_rag_chain():
                         return generate_stream()
                 except Exception as e:
                     print(f"[RAG ERROR] Gemini streaming hatası: {e}")
-                    # Fallback: normal moda geç
                     pass
             
-            # Normal mod (streaming değil)
-            print(f"[RAG DEBUG] Normal mod, LLM çağrısı başlatılıyor...")
+            print(f"[RAG DEBUG] Normal mod, LLM çağrısı başlatılıyor (async)...")
             
-            # Timeout ile LLM çağrısı yap
-            import threading
-            
-            # Thread-safe sonuç saklama
-            result_container = {'result': None, 'error': None}
-            
-            def call_llm():
-                try:
-                    result_container['result'] = (rag_prompt | llm).invoke(input_data)
-                except Exception as e:
-                    result_container['error'] = str(e)
-            
-            # Thread ile çağrı yap ve timeout kontrolü
-            thread = threading.Thread(target=call_llm)
-            thread.daemon = True
-            thread.start()
-            thread.join(timeout=30)  # 30 saniye timeout
-            
-            if thread.is_alive():
+            try:
+                chain = rag_prompt | llm
+                result = await asyncio.wait_for(
+                    chain.ainvoke(input_data),
+                    timeout=30.0
+                )
+            except asyncio.TimeoutError:
                 print("[RAG ERROR] LLM çağrısı timeout oldu (30 saniye)")
                 return "RAG sistemi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+            except Exception as e:
+                print(f"[RAG ERROR] LLM çağrısı hatası: {e}")
+                return f"RAG sistemi hatası: {str(e)}"
             
-            if result_container['error']:
-                print(f"[RAG ERROR] LLM çağrısı hatası: {result_container['error']}")
-                return f"RAG sistemi hatası: {result_container['error']}"
-            
-            result = result_container['result']
             if result is None:
                 print("[RAG ERROR] LLM çağrısı None döndü")
                 return "RAG sistemi yanıt veremedi."
             
-            # Ham cevabı konsola yazdır
             print(f"[RAG DEBUG] Ham result tipi: {type(result)}")
             print(f"[RAG DEBUG] Ham result: {result}")
             
-            # Gemini ve OpenAI çıktılarını normalize et
             if hasattr(result, 'content'):
-                # LangChain response objesi
                 print(f"[RAG DEBUG] Content: {result.content}")
                 return result.content
             elif isinstance(result, str):
-                # String çıktı
                 print(f"[RAG DEBUG] String: {result}")
                 return result
             else:
-                # Diğer durumlar için string'e çevir
                 print(f"[RAG DEBUG] String'e çevriliyor: {str(result)}")
                 return str(result)
                 
         except Exception as e:
             print(f"[RAG ERROR] Beklenmeyen hata: {e}")
-            import traceback
             traceback.print_exc()
             return f"RAG sistemi hatası: {str(e)}"
     
@@ -629,15 +493,12 @@ def create_rag_chain():
 
 
 def create_animal_chain():
-    """Animal chain'i oluşturur - API çağrısı yapar"""
+    """Animal chain'i oluşturur"""
     def animal_processor(user_message: str, user_id: int | None = None) -> Dict[str, Any]:
-        """Hayvan API'sini çağırır ve sonucu döndürür"""
-        # Hayvan API'leri için timeout ve hata yönetimi
+        """Hayvan API'sini çağırır"""
         try:
             print("[ANIMAL CHAIN] Hayvan API'si çağrılıyor...")
-            # OpenAI client oluştur - route_animals client bekliyor
-            from openai import OpenAI
-            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            client = OpenAIClient(api_key=os.getenv("OPENAI_API_KEY"))
             animal_result = route_animals(user_message, client)
             
             if animal_result:
@@ -656,14 +517,12 @@ def create_animal_chain():
                 print(f"[ANIMAL CHAIN] Başarılı: {animal}")
                 return out
             
-            # Hayvan bulunamadı durumu
             error_response = "Hayvan bulunamadı."
             print("[ANIMAL CHAIN] Hayvan bulunamadı")
             return {"response": error_response}
             
         except Exception as e:
             print(f"[ANIMAL CHAIN] Hata: {e}")
-            # Timeout veya API hatası durumunda fallback yanıt
             error_response = "Hayvan API'si şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
             return {"response": error_response}
     
@@ -674,14 +533,10 @@ def create_emotion_chain():
     """Emotion chain'i oluşturur"""
     def emotion_processor(user_message: str, user_id: int | None = None) -> Dict[str, Any]:
         """Duygu analizi yapar"""
-        # Emotion sistemi için OpenAI client oluşturma
         global chatbot_instance
         if chatbot_instance is None:
-            # Fallback mekanizması ile client oluştur
             try:
-                from openai import OpenAI
-                client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-                # Test çağrısı yap
+                client = OpenAIClient(api_key=os.getenv("OPENAI_API_KEY"))
                 client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[{"role": "user", "content": "test"}],
@@ -690,20 +545,16 @@ def create_emotion_chain():
                 chatbot_instance = EmotionChatbot(client)
                 print("[EMOTION] OpenAI API kullanılıyor")
             except Exception:
-                # OpenAI API key kullanılamıyor, Gemini kullan
-                chatbot_instance = EmotionChatbot()  # client=None, Gemini kullanacak
+                chatbot_instance = EmotionChatbot()
                 print("[EMOTION] Gemini API kullanılıyor")
         
         result = chatbot_instance.chat(user_message, user_id)
         
-        # Yeni emotion_system formatına uygun response döndür
-        # Format: {"response": lora_response, "emoji": emoji, "mood": mood, "stats": stats}
         out = {
             "response": result.get("response", ""),
             "stats": result.get("stats", {}),
         }
         
-        # Yeni format alanları ekle
         if "emoji" in result:
             out["emoji"] = result["emoji"]
         if "mood" in result:
@@ -715,7 +566,7 @@ def create_emotion_chain():
 
 
 def create_stats_chain():
-    """Stats chain'i oluşturur - kullanıcı bazlı duygu istatistikleri"""
+    """Stats chain'i oluşturur"""
     stats_system = StatisticSystem()
 
     def stats_processor(user_message: str, user_id: int | None = None) -> Dict[str, Any]:
@@ -728,47 +579,41 @@ def create_stats_chain():
 
     return stats_processor
 
-# =============================================================================
-# CHAIN SYSTEM - Ana İşlem Zinciri
-# =============================================================================
-
 def create_main_processing_chain():
     """Ana işlem zinciri oluşturur"""
     
-    # Alt chain'leri oluştur
     flow_decision_chain = create_flow_decision_chain()
     rag_chain = create_rag_chain()
     animal_processor = create_animal_chain()
     emotion_processor = create_emotion_chain()
     stats_processor = create_stats_chain()
     
-    def process_message(user_message: str, user_id: int | None = None, **kwargs) -> Dict[str, Any]:
-        """Ana mesaj işleme fonksiyonu - SQLite tabanlı sohbet geçmişi ile, streaming desteği ile"""
+    async def process_message(user_message: str, user_id: int | None = None, **kwargs) -> Dict[str, Any]:
+        """Ana mesaj işleme fonksiyonu"""
         try:
-            print("[CHAIN SYSTEM] AŞAMA 1: Akış kararı alınıyor...")
+            print("[CHAIN SYSTEM] AŞAMA 1: Akış kararı alınıyor (async)...")
             
-            # AŞAMA 1: Akış kararı
-            flow_decision = flow_decision_chain({"input": user_message})
+            flow_decision = await flow_decision_chain({"input": user_message})
             print(f"[CHAIN SYSTEM] Akış kararı: {flow_decision}")
             
-            # AŞAMA 2: Seçilen akışa göre işleme
             result = None
             if flow_decision == "RAG":
-                print("[CHAIN SYSTEM] AŞAMA 2: RAG akışı çalışıyor...")
-                # Streaming parametresini al (varsayılan False)
+                print("[CHAIN SYSTEM] AŞAMA 2: RAG akışı çalışıyor (async)...")
                 stream = kwargs.get("stream", False)
-                rag_result = _process_rag_flow(user_message, rag_chain, stream=stream)
+                rag_result = await _process_rag_flow(user_message, rag_chain, stream=stream)
                 if rag_result is None:
                     print("[CHAIN SYSTEM] RAG sonucu None, HELP akışına yönlendiriliyor...")
                     help_result = _process_help_flow(user_message)
                     help_result["flow_type"] = "HELP"
                     result = help_result
                 else:
-                    # Streaming moduysa generator döndür
-                    if stream and hasattr(rag_result, '__iter__') and not isinstance(rag_result, dict):
+                    if stream and (hasattr(rag_result, '__aiter__') or (hasattr(rag_result, '__iter__') and not isinstance(rag_result, dict))):
                         return rag_result
-                    rag_result["flow_type"] = "RAG"
-                    result = rag_result
+                    if isinstance(rag_result, dict):
+                        rag_result["flow_type"] = "RAG"
+                        result = rag_result
+                    else:
+                        result = {"response": str(rag_result), "flow_type": "RAG"}
             elif flow_decision == "ANIMAL":
                 print("[CHAIN SYSTEM] AŞAMA 2: Animal akışı çalışıyor...")
                 animal_result = animal_processor(user_message, user_id)
@@ -795,7 +640,6 @@ def create_main_processing_chain():
                 help_result["flow_type"] = "HELP"
                 result = help_result
             
-            # Conversation kaydı /chat endpoint'inde yapılıyor, burada yapmıyoruz
             return result
                 
         except Exception as e:
@@ -805,11 +649,10 @@ def create_main_processing_chain():
     return process_message
 
 
-def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
-    """RAG akışını işler - PDF'lerden bilgi çeker, streaming desteği ile"""
+async def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
+    """RAG akışını işler"""
     t = user_message.lower()
     
-    # Heuristic: explicit source keywords (hayvan bakım)
     if ("kedi" in t or "cat" in t):
         source = "cat_care.pdf"
     elif ("papağan" in t or "parrot" in t or "kuş" in t):
@@ -817,17 +660,14 @@ def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
     elif ("tavşan" in t or "rabbit" in t):
         source = "rabbit_care.pdf"
     else:
-        # LLM RAG seçtiyse anahtar kelime kontrolü yapmadan genel retrieval dene
         chunks = rag_service.retrieve_top(user_message, top_k=6)
         if not chunks:
             print("[RAG] RAG'de ilgili bilgi bulunamadı")
             return None
         
-        # Context'i oluştur ve debug et
         context_parts = [c.get("text", "").strip() for c in chunks if c.get("text", "").strip()]
         context = "\n\n".join(context_parts)
         
-        # Context boşsa veya çok kısaysa uyar
         if not context or len(context.strip()) < 50:
             print(f"[RAG WARNING] Context çok kısa veya boş: {len(context)} karakter, chunks: {len(chunks)}")
             print(f"[RAG DEBUG] İlk chunk örneği: {chunks[0] if chunks else 'YOK'}")
@@ -835,13 +675,10 @@ def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
         print(f"[RAG DEBUG] Context uzunluğu: {len(context)} karakter")
         sources = list({(c.get("metadata", {}) or {}).get("source", "?") for c in chunks})
         
-        # RAG chain ile işle - context'i prompt'a dahil et
         combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
-        result = rag_chain({"input": combined_input}, stream=stream)
+        result = await rag_chain({"input": combined_input}, stream=stream)
         
-        # Streaming moduysa generator döndür
-        if stream and hasattr(result, '__iter__') and not isinstance(result, str):
-            # Pick first known source for UI hint
+        if stream and hasattr(result, '__aiter__'):
             lit = None
             for s in sources:
                 if s in RAG_SOURCES:
@@ -849,9 +686,7 @@ def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
                     break
             ui = RAG_SOURCES.get(lit or "", None)
             
-            # Streaming generator wrapper
-            def stream_wrapper():
-                # Önce metadata gönder
+            async def stream_wrapper():
                 metadata = {
                     "type": "metadata",
                     "rag": True,
@@ -860,7 +695,32 @@ def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
                 }
                 yield f"data: {json.dumps(metadata, ensure_ascii=False)}\n\n"
                 
-                # Sonra streaming content
+                async for chunk in result:
+                    if chunk:
+                        data = {
+                            "type": "chunk",
+                            "content": chunk
+                        }
+                        yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+            
+            return stream_wrapper()
+        elif stream and hasattr(result, '__iter__') and not isinstance(result, str):
+            lit = None
+            for s in sources:
+                if s in RAG_SOURCES:
+                    lit = s
+                    break
+            ui = RAG_SOURCES.get(lit or "", None)
+            
+            def stream_wrapper():
+                metadata = {
+                    "type": "metadata",
+                    "rag": True,
+                    "rag_source": ui.get("id") if ui else None,
+                    "rag_emoji": ui.get("emoji") if ui else None,
+                }
+                yield f"data: {json.dumps(metadata, ensure_ascii=False)}\n\n"
+                
                 for chunk in result:
                     if chunk:
                         data = {
@@ -871,7 +731,6 @@ def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
             
             return stream_wrapper()
         
-        # Pick first known source for UI hint
         lit = None
         for s in sources:
             if s in RAG_SOURCES:
@@ -885,32 +744,25 @@ def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
             "rag_emoji": ui.get("emoji") if ui else None,
         }
 
-    # Source-filtered retrieval
     chunks = rag_service.retrieve_by_source(user_message, source_filename=source, top_k=6)
     if not chunks:
         return None
     
-    # Context'i oluştur ve debug et
     context_parts = [c.get("text", "").strip() for c in chunks if c.get("text", "").strip()]
     context = "\n\n".join(context_parts)
     
-    # Context boşsa veya çok kısaysa uyar
     if not context or len(context.strip()) < 50:
         print(f"[RAG WARNING] Context çok kısa veya boş: {len(context)} karakter, chunks: {len(chunks)}")
         print(f"[RAG DEBUG] İlk chunk örneği: {chunks[0] if chunks else 'YOK'}")
     
-    # RAG chain ile işle - context'i prompt'a dahil et
     combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
     print(f"[RAG DEBUG] Context uzunluğu: {len(context)} karakter")
-    result = rag_chain({"input": combined_input}, stream=stream)
+    result = await rag_chain({"input": combined_input}, stream=stream)
     
-    # Streaming moduysa generator döndür
-    if stream and hasattr(result, '__iter__') and not isinstance(result, str):
+    if stream and hasattr(result, '__aiter__'):
         ui = RAG_SOURCES.get(source)
         
-        # Streaming generator wrapper
-        def stream_wrapper():
-            # Önce metadata gönder
+        async def stream_wrapper():
             metadata = {
                 "type": "metadata",
                 "rag": True,
@@ -919,7 +771,27 @@ def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
             }
             yield f"data: {json.dumps(metadata, ensure_ascii=False)}\n\n"
             
-            # Sonra streaming content
+            async for chunk in result:
+                if chunk:
+                    data = {
+                        "type": "chunk",
+                        "content": chunk
+                    }
+                    yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+        
+        return stream_wrapper()
+    elif stream and hasattr(result, '__iter__') and not isinstance(result, str):
+        ui = RAG_SOURCES.get(source)
+        
+        def stream_wrapper():
+            metadata = {
+                "type": "metadata",
+                "rag": True,
+                "rag_source": ui.get("id") if ui else None,
+                "rag_emoji": ui.get("emoji") if ui else None,
+            }
+            yield f"data: {json.dumps(metadata, ensure_ascii=False)}\n\n"
+            
             for chunk in result:
                 if chunk:
                     data = {
@@ -940,7 +812,7 @@ def _process_rag_flow(user_message: str, rag_chain, stream: bool = False):
 
 
 def _process_help_flow(user_message: str) -> Dict[str, Any]:
-    """Help akışını işler - kullanıcıya yönlendirici mesaj verir"""
+    """Help akışını işler"""
     help_message = """🤖 Merhaba! Ben akıllı bir chatbot'um ve size şu özelliklerle yardımcı olabilirim:
 
 📚 **BİLGİ SİSTEMİ (RAG)**: 
@@ -963,26 +835,16 @@ def _process_help_flow(user_message: str) -> Dict[str, Any]:
     }
 
 
-# Ana chain'i oluştur
 main_chain = create_main_processing_chain()
 
-
-# =============================================================================
-# FASTAPI ENDPOINTS
-# =============================================================================
-
 def _load_html_template(filename: str) -> str:
-    """
-    HTML template dosyasını yükler ve cache-busting ekler
-    """
+    """HTML template dosyasını yükler"""
     template_path = Path(__file__).parent / "Frontend" / "html" / filename
     try:
         html = template_path.read_text(encoding="utf-8")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"HTML yüklenemedi: {e}")
     try:
-        # Cache-busting: static dosya URL'lerine versiyon parametresi ekle
-        import time
         version = str(int(time.time()))
 
         def _add_version(m):
@@ -1019,18 +881,16 @@ def login_page() -> HTMLResponse:
 
 
 @app.post("/chat")
-def chat(
+async def chat(
     payload: Dict[str, Any],
     authorization: str | None = Header(None, alias="Authorization"),
     stream: bool = Query(False, description="Streaming modunu etkinleştir")
 ):
-    """Ana chat endpoint'i - CHAIN SYSTEM ile akış yönlendirmesi yapar, streaming desteği ile"""
+    """Ana chat endpoint'i"""
     user_message = str(payload.get("message", "")).strip()
     
-    # Streaming parametresini al (query parametresi veya payload'dan)
     stream_enabled = stream or payload.get("stream", False)
     
-    # Conversation ID'sini al (opsiyonel - mevcut conversation'a mesaj eklemek için)
     conversation_id = payload.get("conversation_id")
     if conversation_id is not None:
         try:
@@ -1038,10 +898,8 @@ def chat(
         except (ValueError, TypeError):
             conversation_id = None
     
-    # Kullanıcı ID'sini al (opsiyonel - giriş yapılmışsa)
     user_id = get_current_user_id_optional(authorization)
     
-    # Güvenlik kontrolleri
     if not user_message:
         if stream_enabled:
             def error_stream():
@@ -1049,7 +907,6 @@ def chat(
             return StreamingResponse(error_stream(), media_type="text/event-stream")
         return {"error": "Mesaj boş olamaz"}
     
-    # Mesaj uzunluk kontrolü
     if not _validate_message_length(user_message):
         error_msg = f"Mesaj çok uzun. Maksimum {MAX_MESSAGE_LENGTH} karakter olabilir."
         if stream_enabled:
@@ -1058,7 +915,6 @@ def chat(
             return StreamingResponse(error_stream(), media_type="text/event-stream")
         return {"error": error_msg}
     
-    # Input sanitization
     user_message = _sanitize_input(user_message)
     if user_message == "[Güvenlik nedeniyle mesaj filtrelendi]":
         error_msg = "Güvenlik nedeniyle mesaj filtrelendi"
@@ -1068,11 +924,8 @@ def chat(
             return StreamingResponse(error_stream(), media_type="text/event-stream")
         return {"error": error_msg}
     
-    # Token kontrolü
     estimated_tokens = _estimate_tokens(user_message)
-    # 200+ token ise önce özetlemeyi dene (kaba tahmin üzerinden)
     user_message = _summarize_text_if_needed(user_message, estimated_tokens, token_threshold=200)
-    # Özet sonrası yeniden tahmini token sayısı al (sert limit için paylaşımcı davranış)
     estimated_tokens = _estimate_tokens(user_message)
     if estimated_tokens > MAX_TOKENS_PER_REQUEST:
         error_msg = f"Çok fazla token. Maksimum {MAX_TOKENS_PER_REQUEST} token olabilir."
@@ -1083,29 +936,67 @@ def chat(
         return {"error": error_msg}
 
     try:
-        # CHAIN SYSTEM ile mesaj işleme
-        print(f"[CHAIN SYSTEM] Mesaj işleniyor... Kullanıcı mesajı: {user_message[:100]}..., stream={stream_enabled}")
-        result = main_chain(user_message, user_id, stream=stream_enabled)
+        print(f"[CHAIN SYSTEM] Mesaj işleniyor (async)... Kullanıcı mesajı: {user_message[:100]}..., stream={stream_enabled}")
+        result = await main_chain(user_message, user_id, stream=stream_enabled)
         
-        # Streaming moduysa generator döndür
-        if stream_enabled and hasattr(result, '__iter__') and not isinstance(result, dict):
-            def streaming_wrapper():
+        if stream_enabled and hasattr(result, '__aiter__'):
+            async def streaming_wrapper():
                 full_response = ""
                 try:
-                    for chunk_data in result:
+                    async for chunk_data in result:
                         if chunk_data:
                             yield chunk_data
-                            # Chunk içeriğini biriktir (conversation kaydı için)
                             try:
                                 if chunk_data.startswith("data: "):
-                                    json_str = chunk_data[6:]  # "data: " kısmını çıkar
+                                    json_str = chunk_data[6:]
                                     data = json.loads(json_str)
                                     if data.get("type") == "chunk":
                                         full_response += data.get("content", "")
                             except Exception:
                                 pass
                     
-                    # Streaming tamamlandı, conversation'a kaydet
+                    if user_id and full_response:
+                        try:
+                            saved_conversation_id = save_message_to_conversation(
+                                user_id=user_id,
+                                conversation_id=conversation_id,
+                                user_message=user_message,
+                                bot_response=full_response,
+                                flow_type="RAG"
+                            )
+                            if saved_conversation_id:
+                                final_data = {
+                                    "type": "done",
+                                    "conversation_id": saved_conversation_id
+                                }
+                                yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
+                        except Exception as e:
+                            print(f"[CHAIN SYSTEM] Conversation kayıt hatası: {e}")
+                except Exception as e:
+                    print(f"[CHAIN SYSTEM] Streaming hatası: {e}")
+                    error_data = {
+                        "type": "error",
+                        "error": str(e)
+                    }
+                    yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+            
+            return StreamingResponse(streaming_wrapper(), media_type="text/event-stream")
+        elif stream_enabled and hasattr(result, '__iter__') and not isinstance(result, dict):
+            def streaming_wrapper():
+                full_response = ""
+                try:
+                    for chunk_data in result:
+                        if chunk_data:
+                            yield chunk_data
+                            try:
+                                if chunk_data.startswith("data: "):
+                                    json_str = chunk_data[6:]
+                                    data = json.loads(json_str)
+                                    if data.get("type") == "chunk":
+                                        full_response += data.get("content", "")
+                            except Exception:
+                                pass
+                    
                     if user_id and full_response:
                         try:
                             saved_conversation_id = save_message_to_conversation(
@@ -1133,20 +1024,16 @@ def chat(
             
             return StreamingResponse(streaming_wrapper(), media_type="text/event-stream")
         
-        # Normal mod (streaming değil)
-        # Result'u kontrol et ve hata varsa düzelt
         if isinstance(result, dict) and "error" in result:
             print(f"[CHAIN SYSTEM] Hata tespit edildi: {result['error']}")
             return {"error": result["error"]}
         
-        # Result'un geçerli olduğundan emin ol
         if not isinstance(result, dict):
             print(f"[CHAIN SYSTEM] Geçersiz result tipi: {type(result)}")
             return {"error": "Geçersiz response formatı"}
             
         print(f"[CHAIN SYSTEM] Başarılı response: {result}")
         
-        # Conversation'a mesaj kaydet (kullanıcı giriş yapmışsa)
         if user_id and "error" not in result:
             bot_response = result.get("response", "")
             flow_type = result.get("flow_type")
@@ -1157,7 +1044,6 @@ def chat(
                 bot_response=bot_response,
                 flow_type=flow_type
             )
-            # Response'a conversation_id ekle
             if saved_conversation_id:
                 result["conversation_id"] = saved_conversation_id
         
@@ -1165,7 +1051,6 @@ def chat(
 
     except HTTPException as e:
         print(f"[CHAIN SYSTEM] HTTPException: {e.detail}")
-        import traceback
         traceback.print_exc()
         if stream_enabled:
             def error_stream():
@@ -1174,7 +1059,6 @@ def chat(
         return {"error": e.detail}
     except Exception as e:
         print(f"[CHAIN SYSTEM] Exception: {str(e)}")
-        import traceback
         traceback.print_exc()
         error_msg = f"Sunucu hatası: {str(e)}"
         if stream_enabled:
@@ -1184,20 +1068,9 @@ def chat(
         return {"error": error_msg}
 
 
-# Çalıştırma:
-# uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
 if __name__ == "__main__":
-    """Script doğrudan çalıştırıldığında Uvicorn ile sunucuyu başlatır.
-    - Host: 0.0.0.0
-    - Port: 8000
-    - Reload: True (geliştirme için otomatik yeniden yükleme)
-    """
+    """Uvicorn ile sunucuyu başlatır"""
     try:
-        # Uvicorn'u sadece ihtiyaç olduğunda import et (dinamik import)
-        import uvicorn  # type: ignore
-        # Modül:app şeklinde string kullanmak, reload modunda sağlıklı yeniden yükleme sağlar
         uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
     except Exception as e:
-        # Çalışma zamanında oluşabilecek hataları kullanıcıya bildir
         print(f"[SERVER] Uvicorn başlatma hatası: {e}")

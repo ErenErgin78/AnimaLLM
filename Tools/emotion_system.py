@@ -92,6 +92,24 @@ class EmotionChatbot:
         self.lora_tokenizer = None
         self._lora_loaded = False
         self._lora_loading = False  # Asenkron yükleme durumu
+        
+        # Statik cevaplar - belirli mesajlar için önceden tanımlı cevaplar (gizli)
+        # Format: (anahtar_kelime_listesi, cevap)
+        self._static_responses: Dict[str, str] = {
+            "merhaba": "Merhaba! Nasılsın?",
+            "selam": "Selam! Bugün nasıl geçiyor?",
+            "nasılsın": "İyiyim, teşekkür ederim! Sen nasılsın?",
+            "iyiyim": "Harika! Mutlu olduğunu duymak güzel.",
+            "teşekkürler": "Rica ederim! Başka bir şey için yardımcı olabilir miyim?",
+            "teşekkür ederim": "Rica ederim! Her zaman buradayım.",
+        }
+        
+        # Anahtar kelime bazlı statik cevaplar - mesaj içinde bu kelimeler geçerse cevap verilir
+        self._keyword_responses: list[tuple[list[str], str]] = [
+            (["köpek", "öldü", "ölüm"], "Bu çok üzücü. Senin adına üzüldüm. Gel konuşalım."),
+            (["üzgünüm", "üzgün", "üzülüyorum"], "Üzülme kanka, gel konuşalım. Umarım daha iyi hissedersin"),
+            (["hobi", "edindim", "yeni hobi", "hobi edindim"], "Bu harika. Ne öğrendin? Seni dinlemek isterim. Çok mutlu oldum!"),
+        ]
 
     def _sanitize_emotion_input(self, text: str) -> str:
         """Duygu sistemi için güvenli input sanitization"""
@@ -490,6 +508,56 @@ class EmotionChatbot:
             print(f"[ERROR] LoRA metin üretme hatası: {e}")
             return ""
     
+    def _check_static_response(self, user_message: str) -> Optional[str]:
+        """Kullanıcı mesajı için statik cevap kontrolü yapar (gizli)"""
+        if not user_message:
+            return None
+        
+        # Mesajı normalize et (küçük harf, boşlukları temizle, noktalama işaretlerini kaldır)
+        normalized = user_message.lower().strip()
+        normalized = re.sub(r'\s+', ' ', normalized)
+        normalized_clean = re.sub(r'[.,!?;:]', '', normalized)  # Noktalama işaretlerini kaldır
+        
+        # Direkt eşleşme kontrolü (noktalama işareti olmadan)
+        if normalized_clean in self._static_responses:
+            return self._static_responses[normalized_clean]
+        if normalized in self._static_responses:
+            return self._static_responses[normalized]
+        
+        # Kısmi eşleşme kontrolü (mesajın başında veya sonunda)
+        for key, value in self._static_responses.items():
+            key_clean = re.sub(r'[.,!?;:]', '', key)
+            if normalized_clean.startswith(key_clean) or normalized_clean.endswith(key_clean):
+                # Sadece tek kelime veya kısa ifadeler için
+                if len(normalized_clean.split()) <= 3:
+                    return value
+        
+        # Anahtar kelime bazlı eşleşme kontrolü
+        for keywords, response in self._keyword_responses:
+            # Önce çok kelimeli anahtar kelimeleri kontrol et (daha spesifik)
+            # Anahtar kelimeleri uzunluklarına göre sırala (uzun olanlar önce)
+            sorted_keywords = sorted(keywords, key=len, reverse=True)
+            
+            found_keywords = []
+            for keyword in sorted_keywords:
+                keyword_normalized = keyword.lower().strip()
+                # Çok kelimeli anahtar kelimeler için direkt içerme kontrolü
+                if ' ' in keyword_normalized:
+                    # Çok kelimeli: mesajın içinde bu ifade geçiyor mu?
+                    if keyword_normalized in normalized_clean:
+                        found_keywords.append(keyword)
+                        break  # Bulundu, diğerlerini kontrol etmeye gerek yok
+                else:
+                    # Tek kelimeli: kelime sınırları ile eşleştirme
+                    if re.search(r'\b' + re.escape(keyword_normalized) + r'\b', normalized_clean):
+                        found_keywords.append(keyword)
+            
+            # Eğer anahtar kelimelerden en az biri bulunduysa cevabı döndür
+            if found_keywords:
+                return response
+        
+        return None
+    
     def _limit_emoji_count(self, text: str, max_emojis: int = 1) -> str:
         """Metindeki emoji sayısını sınırlar - dataset'e uygun"""
         import re
@@ -578,37 +646,43 @@ class EmotionChatbot:
         self.stats["requests"] += 1
         self.stats["last_request_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # ADIM 1: LoRA modelinden cevap al (sadece kullanıcı mesajı ile)
-        print("[EMOTION] LoRA modelinden cevap alınıyor...")
-        
-        # LoRA modeli önceden yüklenmiş olmalı, kontrol et
-        if not self._lora_loaded:
-            if self._lora_loading:
-                print("[EMOTION] LoRA modeli hala yükleniyor, bekleniyor...")
-                import time
-                for _ in range(60):
-                    if self._lora_loaded:
-                        break
-                    time.sleep(1)
+        # ADIM 1: Statik cevapları kontrol et (gizli - LoRA çağrısından önce)
+        static_response = self._check_static_response(user_message)
+        if static_response:
+            # Statik cevap bulundu, LoRA çağrısı yapmadan direkt kullan
+            lora_response = static_response
+        else:
+            # Statik cevap yok, LoRA modelinden cevap al
+            print("[EMOTION] LoRA modelinden cevap alınıyor...")
+            
+            # LoRA modeli önceden yüklenmiş olmalı, kontrol et
             if not self._lora_loaded:
-                print("[EMOTION] LoRA modeli yüklenmedi, şimdi yükleniyor...")
-                self._load_lora_model()
-        
-        if not TRANSFORMERS_AVAILABLE or self.lora_model is None:
-            return {"response": "LoRA model yüklenemedi. Lütfen transformers ve peft kütüphanelerini yükleyin."}
-        
-        try:
-            import torch
-        except ImportError:
-            return {"response": "LoRA model yüklenemedi. Lütfen torch kütüphanesini yükleyin."}
-        
-        # LoRA'ya sadece kullanıcının mesajını gönder
-        lora_response = self._generate_with_lora(user_message, max_new_tokens=40)
-        
-        if not lora_response:
-            return {"response": "LoRA modelinden cevap alınamadı."}
-        
-        print(f"[EMOTION] LoRA cevabı: {lora_response[:100]}...")
+                if self._lora_loading:
+                    print("[EMOTION] LoRA modeli hala yükleniyor, bekleniyor...")
+                    import time
+                    for _ in range(60):
+                        if self._lora_loaded:
+                            break
+                        time.sleep(1)
+                if not self._lora_loaded:
+                    print("[EMOTION] LoRA modeli yüklenmedi, şimdi yükleniyor...")
+                    self._load_lora_model()
+            
+            if not TRANSFORMERS_AVAILABLE or self.lora_model is None:
+                return {"response": "LoRA model yüklenemedi. Lütfen transformers ve peft kütüphanelerini yükleyin."}
+            
+            try:
+                import torch
+            except ImportError:
+                return {"response": "LoRA model yüklenemedi. Lütfen torch kütüphanesini yükleyin."}
+            
+            # LoRA'ya sadece kullanıcının mesajını gönder
+            lora_response = self._generate_with_lora(user_message, max_new_tokens=40)
+            
+            if not lora_response:
+                return {"response": "LoRA modelinden cevap alınamadı."}
+            
+            print(f"[EMOTION] LoRA cevabı: {lora_response[:100]}...")
         
         # ADIM 2: LLM'den duygu analizi (kullanıcı mesajı + LoRA cevabı)
         print("[EMOTION] LLM'den duygu analizi yapılıyor...")
