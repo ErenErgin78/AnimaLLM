@@ -218,8 +218,8 @@ class RagService:
         except Exception:
             return ""
 
-    def _chunk_text(self, text: str, chunk_size: int = 900, chunk_overlap: int = 150) -> List[str]:
-        """Metni parçalara böler"""
+    def _chunk_text(self, text: str, chunk_size: int = 1200, chunk_overlap: int = 250) -> List[str]:
+        """Metni parçalara böler - daha büyük chunk'lar kullanır"""
         text = (text or "").strip()
         if not text:
             return []
