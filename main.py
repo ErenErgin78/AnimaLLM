@@ -15,6 +15,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Header, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from langchain_openai import OpenAI
@@ -39,13 +40,25 @@ from Auth.conversation_service import (
     create_conversation, get_conversation_by_id,
     add_message_to_conversation, update_conversation_title
 )
-from Auth.models import User
+from Auth.models import User, Conversation, ChatHistory
+from sqlalchemy import func
+from datetime import datetime
+from pydantic import BaseModel
 
 import uvicorn
 
 load_dotenv()
 
 app = FastAPI(title="CHAIN SYSTEM - Akıllı Chatbot Sistemi", version="3.0.0")
+
+# CORS middleware ekle - n8n ve diğer external client'lar için
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Production'da spesifik domain'ler belirtilmeli
+    allow_credentials=True,
+    allow_methods=["*"],  # Tüm HTTP method'larına izin ver (GET, POST, OPTIONS, vb.)
+    allow_headers=["*"],  # Tüm header'lara izin ver
+)
 
 app.include_router(auth_router)
 
@@ -1068,8 +1081,126 @@ async def chat(
         return {"error": error_msg}
 
 
+# Admin Report Endpoint için Pydantic model
+class ReportPasswordRequest(BaseModel):
+    """Admin rapor şifre isteği modeli"""
+    password: str
+
+
+@app.post("/admin/report")
+async def admin_report(request: ReportPasswordRequest):
+    """
+    Admin rapor endpoint'i - sistem istatistiklerini döndürür
+    .env dosyasındaki REPORT_PASSWORD ile korunur
+    """
+    try:
+        # Şifre kontrolü - .env'den REPORT_PASSWORD oku
+        report_password = os.getenv("REPORT_PASSWORD")
+        if not report_password:
+            raise HTTPException(
+                status_code=500,
+                detail="REPORT_PASSWORD .env dosyasında tanımlı değil"
+            )
+        
+        # Şifre doğrulama
+        if request.password != report_password:
+            raise HTTPException(
+                status_code=401,
+                detail="Geçersiz şifre"
+            )
+        
+        # Veritabanı bağlantısı
+        db = next(get_db())
+        try:
+            # Bugünün başlangıcı (00:00:00)
+            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            # Bugünkü yeni kullanıcı sayısı
+            new_users_today = db.query(func.count(User.id))\
+                .filter(User.created_at >= today_start)\
+                .scalar() or 0
+            
+            # Toplam kullanıcı sayısı
+            total_users = db.query(func.count(User.id)).scalar() or 0
+            
+            # Toplam conversation sayısı
+            total_conversations = db.query(func.count(Conversation.id)).scalar() or 0
+            
+            # Toplam mesaj sayısı
+            total_messages = db.query(func.count(ChatHistory.id)).scalar() or 0
+            
+            # Tool istatistikleri (flow_type bazlı)
+            tool_stats_query = db.query(
+                ChatHistory.flow_type,
+                func.count(ChatHistory.id).label('count')
+            ).group_by(ChatHistory.flow_type).all()
+            
+            # Tool istatistiklerini dictionary'ye çevir
+            tool_stats = {}
+            for flow_type, count in tool_stats_query:
+                tool_name = flow_type if flow_type else "UNKNOWN"
+                tool_stats[tool_name] = int(count)
+            
+            # Ortalama sohbet uzunluğu (conversation başına ortalama mesaj sayısı)
+            avg_conversation_length = 0.0
+            if total_conversations > 0:
+                avg_conversation_length = round(total_messages / total_conversations, 2)
+            
+            # Kullanıcı başına ortalama mesaj sayısı
+            avg_messages_per_user = 0.0
+            if total_users > 0:
+                avg_messages_per_user = round(total_messages / total_users, 2)
+            
+            # Kullanıcı başına ortalama token uzunluğu hesapla
+            # Token sayısı yaklaşık olarak karakter sayısının 1/4'ü olarak tahmin edilir
+            avg_tokens_per_user = 0.0
+            if total_users > 0:
+                # Tüm mesajların toplam karakter sayısını hesapla
+                all_messages = db.query(
+                    func.length(ChatHistory.user_message) + func.length(ChatHistory.bot_response)
+                ).all()
+                
+                total_characters = sum(length[0] for length in all_messages if length[0] is not None)
+                # Token sayısı = karakter sayısı / 4
+                total_tokens = total_characters / 4
+                avg_tokens_per_user = round(total_tokens / total_users, 2)
+            
+            # Raporu oluştur
+            report = {
+                "date": datetime.now().isoformat(),
+                "new_users_today": int(new_users_today),
+                "total_users": int(total_users),
+                "total_conversations": int(total_conversations),
+                "total_messages": int(total_messages),
+                "rag_usage_count": int(tool_stats.get("RAG", 0)),
+                "animal_usage_count": int(tool_stats.get("ANIMAL", 0)),
+                "emotion_usage_count": int(tool_stats.get("EMOTION", 0)),
+                "stats_usage_count": int(tool_stats.get("STATS", 0)),
+                "help_usage_count": int(tool_stats.get("HELP", 0)),
+                "unknown_usage_count": int(tool_stats.get("UNKNOWN", 0)),
+                "average_conversation_length": avg_conversation_length,
+                "average_messages_per_user": avg_messages_per_user,
+                "average_tokens_per_user": avg_tokens_per_user
+            }
+            
+            return report
+            
+        finally:
+            db.close()
+            
+    except HTTPException:
+        # HTTPException'ı tekrar fırlat
+        raise
+    except Exception as e:
+        print(f"[ADMIN REPORT ERROR] Rapor oluşturma hatası: {e}")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Rapor oluşturulamadı: {str(e)}"
+        )
+
+
 if __name__ == "__main__":
-    """Uvicorn ile sunucuyu başlatır"""
     try:
         uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
     except Exception as e:
