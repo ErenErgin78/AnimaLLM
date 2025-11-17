@@ -199,6 +199,11 @@ window.addEventListener('DOMContentLoaded', () => {
         updateHistoryButtonVisibility();
     }
     
+    // Logoyu tema değişikliğine göre güncelle (varsa)
+    if (typeof updateLogoForTheme === 'function') {
+        updateLogoForTheme();
+    }
+    
     // Matrix'i erken başlat (canvas hazır olduğunda)
     if (typeof setupMatrix === 'function') {
         setupMatrix();

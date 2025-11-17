@@ -4,6 +4,25 @@
  */
 
 /**
+ * Logoyu tema değişikliğine göre günceller
+ */
+function updateLogoForTheme() {
+    const logo = document.getElementById('main-logo');
+    if (!logo) return;
+    
+    const root = document.documentElement;
+    const isDark = root.classList.contains('dark');
+    
+    // Dark tema (siyah arka plan) -> Light logo
+    // Light tema (beyaz arka plan) -> Dark logo
+    if (isDark) {
+        logo.src = '/static/img/Logo_Light.png';
+    } else {
+        logo.src = '/static/img/Logo_Dark.png';
+    }
+}
+
+/**
  * Tema uygular
  * @param {string} theme - 'dark' veya 'light'
  */
@@ -15,6 +34,7 @@ function applyTheme(theme) {
         root.classList.remove('dark');
     }
     localStorage.setItem('theme', theme);
+    updateLogoForTheme();
 }
 
 /**

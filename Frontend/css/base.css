@@ -38,6 +38,19 @@ h1 {
     text-align: center;
 }
 
+/* Logo container ve stil */
+.logo-container {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.main-logo {
+    max-width: 300px;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
 pre {
     white-space: pre-wrap;
     word-break: break-word;
@@ -87,6 +100,12 @@ pre {
     -webkit-backdrop-filter: blur(0.375rem); /* 6px */
 }
 
+/* Light theme için user email daha açık gri */
+:root:not(.dark) .user-email {
+    background: rgba(0,0,0,0.15);
+    border: 1px solid rgba(0,0,0,0.2);
+}
+
 .top-right-actions .action-btn {
     text-decoration: none;
     display: inline-flex;
@@ -118,6 +137,12 @@ pre {
 .bottom-left-actions #settings-toggle-btn.active {
     background: rgba(0, 0, 0, 0.42);
     border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* Light theme için settings toggle active durumu daha açık */
+:root:not(.dark) .bottom-left-actions #settings-toggle-btn.active {
+    background: rgba(0, 0, 0, 0.25);
+    border-color: rgba(0, 0, 0, 0.3);
 }
 
 .settings-panel {
@@ -179,6 +204,13 @@ pre {
     backdrop-filter: blur(0.375rem); /* 6px */
     -webkit-backdrop-filter: blur(0.375rem); /* 6px */
     transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+
+/* Light theme için action butonlar daha açık gri */
+:root:not(.dark) .action-btn {
+    background: rgba(0,0,0,0.15);
+    border: 1px solid rgba(0,0,0,0.2);
+    color: var(--text);
 }
 
 .action-btn:hover {
