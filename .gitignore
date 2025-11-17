@@ -85,3 +85,6 @@ Lora/Model/base_models/
 
 # Auth
 *.db
+
+# N8N Gmail API
+data/*.json
