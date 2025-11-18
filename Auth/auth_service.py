@@ -6,7 +6,7 @@ JWT token üretimi, şifre hashleme ve kullanıcı doğrulama işlemleri
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from Auth.models import User
@@ -15,10 +15,6 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-
-# Şifre hashleme context'i - bcrypt algoritması kullanır
-# bcrypt: Güvenli şifre hashleme algoritması (salt otomatik eklenir)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT ayarları - environment variable'dan alınır
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
@@ -29,11 +25,24 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 gün (dakika cinsinden)
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Düz metin şifreyi hashlenmiş şifre ile karşılaştırır
+    passlib ve bcrypt ile oluşturulmuş hash'ler uyumludur
     """
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        # Boş değer kontrolü
+        if not plain_password or not hashed_password:
+            return False
+        
+        # bcrypt hash'i bytes'a çevir (eğer string ise)
+        if isinstance(hashed_password, str):
+            hashed_password = hashed_password.encode('utf-8')
+        
+        # Şifreyi doğrula (passlib ve bcrypt hash'leri aynı formatta olduğu için uyumlu)
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
+    except (ValueError, TypeError) as e:
+        # Hash format hatası - güvenlik nedeniyle False döndür
+        print(f"[AUTH ERROR] Şifre doğrulama format hatası: {e}")
+        return False
     except Exception as e:
-        # Hash doğrulama hatası - güvenlik nedeniyle False döndür
         print(f"[AUTH ERROR] Şifre doğrulama hatası: {e}")
         return False
 
@@ -43,7 +52,10 @@ def get_password_hash(password: str) -> str:
     Şifreyi hashler - bcrypt ile güvenli hash üretir
     """
     try:
-        return pwd_context.hash(password)
+        # bcrypt ile şifreyi hashle (salt otomatik eklenir)
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        # String olarak döndür (veritabanında saklamak için)
+        return hashed.decode('utf-8')
     except Exception as e:
         print(f"[AUTH ERROR] Şifre hashleme hatası: {e}")
         raise HTTPException(

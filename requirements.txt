@@ -7,8 +7,7 @@ pydantic==2.9.0
 # Auth dependencies - Kullanıcı giriş/çıkış sistemi için
 sqlalchemy==2.0.23  # Veritabanı ORM
 python-jose[cryptography]==3.3.0  # JWT token işlemleri
-passlib[bcrypt]==1.7.4  # Şifre hashleme (bcrypt)
-bcrypt==4.1.2  # Bcrypt algoritması
+bcrypt>=4.0.1  # Bcrypt algoritması (chromadb ile uyumlu)
 pydantic[email]
 
 # CHAIN SYSTEM - LangChain dependencies (uyumlu versiyonlar)

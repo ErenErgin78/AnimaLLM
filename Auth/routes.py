@@ -3,9 +3,13 @@ Auth API route'ları
 Kullanıcı kayıt, giriş, çıkış ve profil endpoint'leri
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import os
+import httpx
+from urllib.parse import urlencode
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy.orm import Session
-from Auth.database import get_db
+from sqlalchemy import func
+from Auth.database import get_db, SessionLocal
 from Auth.schemas import (
     UserRegister, UserLogin, UserResponse, TokenResponse,
     ChatHistoryCreate, ChatHistoryResponse, ChatHistoryListResponse,
@@ -22,22 +26,112 @@ from Auth.conversation_service import (
 )
 from Auth.workspace_service import get_workspace_state, upsert_workspace_state
 from datetime import datetime, timezone
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Router oluştur - tüm auth endpoint'leri burada
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
+async def call_n8n_webhook(user_data: dict):
+    """
+    n8n webhook'larını GET request ile çağırır - hem /webhook-test/ hem de /webhook/ endpoint'lerine istek gönderir
+    Kullanıcı kayıt bilgilerini ve toplam kullanıcı sayısını query parametreleri olarak gönderir
+    """
+    db = None
+    try:
+        # .env dosyasından webhook UUID'sini al
+        webhook_uuid = os.getenv("N8N_WEBHOOK")
+        if not webhook_uuid:
+            print("[N8N WEBHOOK] N8N_WEBHOOK değişkeni .env dosyasında tanımlı değil, webhook çağrısı atlanıyor")
+            return
+        
+        # UUID'yi temizle (boşlukları kaldır)
+        webhook_uuid = webhook_uuid.strip()
+        
+        # Veritabanından toplam kullanıcı sayısını al
+        try:
+            db = SessionLocal()
+            total_users = db.query(func.count(User.id)).scalar() or 0
+        except Exception as e:
+            print(f"[N8N WEBHOOK] Toplam kullanıcı sayısı alınamadı: {e}")
+            total_users = 0
+        finally:
+            if db:
+                db.close()
+        
+        # Query parametrelerini hazırla - None değerleri filtrele ve string'e çevir
+        params = {k: str(v) for k, v in user_data.items() if v is not None}
+        # Toplam kullanıcı sayısını ekle
+        params["total_users"] = str(total_users)
+        
+        # Query string'i oluştur
+        query_string = urlencode(params) if params else ""
+        
+        # İki webhook URL'i oluştur
+        base_url = "http://localhost:5678"
+        webhook_urls = [
+            f"{base_url}/webhook-test/{webhook_uuid}",
+            f"{base_url}/webhook/{webhook_uuid}"
+        ]
+        
+        # Her iki URL'e de GET isteği gönder
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for webhook_url in webhook_urls:
+                try:
+                    # URL'e query parametrelerini ekle
+                    if query_string:
+                        full_url = f"{webhook_url}?{query_string}"
+                    else:
+                        full_url = webhook_url
+                    
+                    response = await client.get(full_url)
+                    response.raise_for_status()
+                    print(f"[N8N WEBHOOK] {webhook_url} başarıyla çağrıldı: {response.status_code}")
+                
+                except httpx.TimeoutException:
+                    print(f"[N8N WEBHOOK] {webhook_url} çağrısı timeout oldu (10 saniye)")
+                except httpx.HTTPStatusError as e:
+                    print(f"[N8N WEBHOOK] {webhook_url} HTTP hatası: {e.response.status_code} - {e.response.text}")
+                except Exception as e:
+                    print(f"[N8N WEBHOOK] {webhook_url} çağrısı hatası: {e}")
+    
+    except Exception as e:
+        print(f"[N8N WEBHOOK] Webhook çağrısı genel hatası: {e}")
+    finally:
+        # Veritabanı bağlantısını kapat (eğer açıksa)
+        if db:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(
+async def register(
     user_data: UserRegister,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
-    Yeni kullanıcı kaydı oluşturur
+    Yeni kullanıcı kaydı oluşturur ve n8n webhook'unu tetikler
     """
     try:
         # Yeni kullanıcı oluştur
         new_user = create_user(db, user_data)
+        
+        # Webhook için kullanıcı bilgilerini hazırla (şifre hariç)
+        webhook_data = {
+            "id": new_user.id,
+            "username": new_user.username,
+            "name": new_user.name,
+            "email": new_user.email,
+            "created_at": new_user.created_at.isoformat() if new_user.created_at else None
+        }
+        
+        # n8n webhook'unu background task olarak çağır (non-blocking)
+        background_tasks.add_task(call_n8n_webhook, webhook_data)
         
         # Kullanıcı bilgilerini döndür (şifre hariç)
         return UserResponse(
