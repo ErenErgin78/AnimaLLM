@@ -452,13 +452,63 @@ def create_rag_chain():
                                     stream=True
                                 )
                                 
+                                chunk_count = 0
                                 for chunk in response:
-                                    if chunk.text:
-                                        yield chunk.text
+                                    try:
+                                        # Response'un geçerli olup olmadığını kontrol et
+                                        if hasattr(chunk, 'candidates') and chunk.candidates:
+                                            candidate = chunk.candidates[0]
+                                            
+                                            # finish_reason kontrolü - güvenlik ve diğer engellemeler
+                                            finish_reason = None
+                                            if hasattr(candidate, 'finish_reason'):
+                                                finish_reason = candidate.finish_reason
+                                            
+                                            # finish_reason değeri kontrolü (int veya enum olabilir)
+                                            if finish_reason is not None:
+                                                finish_reason_val = finish_reason
+                                                # Enum ise değerini al
+                                                if hasattr(finish_reason, 'value'):
+                                                    finish_reason_val = finish_reason.value
+                                                elif hasattr(finish_reason, 'name'):
+                                                    finish_reason_name = finish_reason.name
+                                                    # MAX_TOKENS, vb. kontrolü
+                                                    if finish_reason_val != 0:  # 0 = UNSPECIFIED
+                                                        print(f"[RAG WARNING] finish_reason: {finish_reason_name or finish_reason_val}")
+                                            
+                                            # Text içeriğini güvenli şekilde oku - parts kontrolü
+                                            if hasattr(candidate, 'content') and candidate.content:
+                                                if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                                                    for part in candidate.content.parts:
+                                                        if hasattr(part, 'text') and part.text:
+                                                            chunk_count += 1
+                                                            yield part.text
+                                                # Eğer parts yoksa ama text direkt varsa
+                                                elif hasattr(candidate.content, 'text') and candidate.content.text:
+                                                    chunk_count += 1
+                                                    yield candidate.content.text
+                                        elif hasattr(chunk, 'text') and chunk.text:
+                                            # Direkt text varsa kullan
+                                            chunk_count += 1
+                                            yield chunk.text
+                                    except AttributeError as ae:
+                                        # response.text quick accessor hatası - parts kontrolü yapıldı
+                                        print(f"[RAG WARNING] Chunk attribute hatası: {ae}")
+                                        continue
+                                    except Exception as chunk_error:
+                                        print(f"[RAG WARNING] Chunk işleme hatası: {chunk_error}")
+                                        continue
+                                    
                                     await asyncio.sleep(0)
+                                
+                                if chunk_count == 0:
+                                    print("[RAG ERROR] Hiçbir chunk içeriği alınamadı")
+                                    return
+                                    
                             except Exception as e:
                                 print(f"[RAG ERROR] Streaming hatası: {e}")
-                                yield f"RAG sistemi hatası: {str(e)}"
+                                traceback.print_exc()
+                                return
                         
                         return generate_stream()
                 except Exception as e:
@@ -475,14 +525,15 @@ def create_rag_chain():
                 )
             except asyncio.TimeoutError:
                 print("[RAG ERROR] LLM çağrısı timeout oldu (30 saniye)")
-                return "RAG sistemi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+                return "Üzgünüm, şu anda yanıt veremiyorum. Lütfen daha sonra tekrar deneyin."
             except Exception as e:
                 print(f"[RAG ERROR] LLM çağrısı hatası: {e}")
-                return f"RAG sistemi hatası: {str(e)}"
+                traceback.print_exc()
+                return "Üzgünüm, şu anda yanıt veremiyorum. Lütfen daha sonra tekrar deneyin."
             
             if result is None:
                 print("[RAG ERROR] LLM çağrısı None döndü")
-                return "RAG sistemi yanıt veremedi."
+                return "Üzgünüm, şu anda yanıt veremiyorum. Lütfen daha sonra tekrar deneyin."
             
             print(f"[RAG DEBUG] Ham result tipi: {type(result)}")
             print(f"[RAG DEBUG] Ham result: {result}")
@@ -500,7 +551,7 @@ def create_rag_chain():
         except Exception as e:
             print(f"[RAG ERROR] Beklenmeyen hata: {e}")
             traceback.print_exc()
-            return f"RAG sistemi hatası: {str(e)}"
+            return "Üzgünüm, şu anda yanıt veremiyorum. Lütfen daha sonra tekrar deneyin."
     
     return rag_processor
 
